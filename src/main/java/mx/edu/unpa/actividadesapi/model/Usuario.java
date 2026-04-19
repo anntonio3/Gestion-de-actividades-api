@@ -2,13 +2,14 @@ package mx.edu.unpa.actividadesapi.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import mx.edu.unpa.actividadesapi.enums.Rol;
 
 import java.time.LocalDateTime;
 
 @Data
 @Entity
 @Table(name = "usuarios")
-public class usuarios {
+public class Usuario {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,9 +43,5 @@ public class usuarios {
         this.fechaRegistro = LocalDateTime.now();
     }
 
-    public enum Rol {
-        ADMIN,
-        PROFESOR
-    }
 
 }
