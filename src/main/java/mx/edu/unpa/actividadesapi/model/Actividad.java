@@ -6,6 +6,7 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -46,11 +47,6 @@ public class Actividad {
     @Column(name = "estado", nullable = false)
     private EstadoActividad estado = EstadoActividad.PENDIENTE;
 
-    // Relación con usuarios (vicerrector que revisa) — puede ser null
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_vicerrector", nullable = true)
-    private Usuario vicerrector;
-
     @Column(name = "motivo_rechazo", columnDefinition = "TEXT")
     private String motivoRechazo;
 
@@ -62,6 +58,10 @@ public class Actividad {
 
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
+
+    // NUEVO
+    @OneToMany(mappedBy = "actividad", fetch = FetchType.LAZY)
+    private List<ActividadImagen> imagenes;
 
     @PrePersist
     protected void onCreate() {

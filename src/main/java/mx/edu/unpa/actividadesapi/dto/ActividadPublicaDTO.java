@@ -10,8 +10,10 @@ public class ActividadPublicaDTO {
     private Integer id;
     private String nombre;
     private String descripcion;
-    private LocalDate fecha;
+    private LocalDate fechaActividad;
     private LocalTime horaInicio;
     private LocalTime horaFin;
     private String tipo;       // nombre del tipo: "Académica", "Cultural"...
+    private String categoria;
+    private String imagenPortada; // url de la imagen
 }
