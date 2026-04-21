@@ -4,8 +4,12 @@ import mx.edu.unpa.actividadesapi.dto.response.catalogo.*;
 import mx.edu.unpa.actividadesapi.service.CatalogoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @RestController
@@ -45,16 +49,21 @@ public class CatalogoController {
         return ResponseEntity.ok(catalogoService.getDepartamentos());
     }
 
-    // Reemplaza el GET /recursos por estos dos
     @GetMapping("/recursos/espacios")
-    public ResponseEntity<List<EspacioResponse>> getEspacios() {
-        log.info("GET /api/recursos/espacios");
-        return ResponseEntity.ok(catalogoService.getEspacios());
+    public ResponseEntity<List<EspacioResponse>> getEspacios(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime horaInicio,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime horaFin) {
+        log.info("GET /api/recursos/espacios fecha={} inicio={} fin={}", fecha, horaInicio, horaFin);
+        return ResponseEntity.ok(catalogoService.getEspacios(fecha, horaInicio, horaFin));
     }
 
     @GetMapping("/recursos/mobiliario")
-    public ResponseEntity<List<MobiliarioResponse>> getMobiliario() {
-        log.info("GET /api/recursos/mobiliario");
-        return ResponseEntity.ok(catalogoService.getMobiliario());
+    public ResponseEntity<List<MobiliarioResponse>> getMobiliario(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime horaInicio,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime horaFin) {
+        log.info("GET /api/recursos/mobiliario fecha={} inicio={} fin={}", fecha, horaInicio, horaFin);
+        return ResponseEntity.ok(catalogoService.getMobiliario(fecha, horaInicio, horaFin));
     }
 }

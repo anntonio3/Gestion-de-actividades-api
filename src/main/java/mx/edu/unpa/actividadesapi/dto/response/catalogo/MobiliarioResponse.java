@@ -7,13 +7,15 @@ public class MobiliarioResponse {
     private Integer idRecurso;
     private String nombre;
     private String descripcion;
-    private Integer cantidad;
+    private Integer cantidadTotal;       // el inventario
+    private Integer cantidadDisponible;  // lo realmente libre en ese rango
 
-    public MobiliarioResponse(Integer idRecurso, String nombre, String descripcion, Integer cantidad) {
+    public MobiliarioResponse(Integer idRecurso, String nombre, String descripcion, Integer cantidadTotal, Integer cantidadDisponible) {
         this.idRecurso = idRecurso;
         this.nombre = nombre;
         this.descripcion = descripcion;
-        this.cantidad = cantidad;
+        this.cantidadTotal = cantidadTotal;
+        this.cantidadDisponible = cantidadDisponible;
     }
 
 }

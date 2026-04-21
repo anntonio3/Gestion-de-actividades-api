@@ -49,6 +49,11 @@ public class ActividadServiceImpl implements ActividadService {
     @Autowired
     private StorageService storageService;
 
+    @Autowired
+    private RecursoEspacioRepository recursoEspacioRepository;
+    @Autowired
+    private RecursoMobiliarioRepository recursoMobiliarioRepository;
+
 
     @Override
     @Transactional
@@ -99,6 +104,39 @@ public class ActividadServiceImpl implements ActividadService {
             Recurso recurso = recursoRepository.findById(recursoReq.getIdRecurso())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Recurso no encontrado con id: " + recursoReq.getIdRecurso()));
+
+
+            // Si es espacio, verificar que esté libre
+            if (recurso instanceof RecursoEspacio) {
+                var ocupados = recursoEspacioRepository.findIdsOcupados(
+                        request.getFechaActividad(),
+                        request.getHoraInicio(),
+                        request.getHoraFin());
+                if (ocupados.contains(recurso.getIdRecurso())) {
+                    throw new BusinessException(
+                            "El espacio '" + recurso.getNombre() + "' ya está ocupado en ese horario");
+                }
+            }
+
+            // Si es mobiliario, verificar cantidad disponible
+            if (recurso instanceof RecursoMobiliario mobiliario) {
+                var ocupadas = recursoMobiliarioRepository.findCantidadesOcupadas(
+                        request.getFechaActividad(),
+                        request.getHoraInicio(),
+                        request.getHoraFin());
+
+                int ocupada = ocupadas.stream()
+                        .filter(row -> ((Long) row[0]).equals(recurso.getIdRecurso()))
+                        .mapToInt(row -> ((Number) row[1]).intValue())
+                        .findFirst().orElse(0);
+
+                int disponible = mobiliario.getCantidad() - ocupada;
+                if (recursoReq.getCantidadRequerida() > disponible) {
+                    throw new BusinessException(
+                            "Solo hay " + disponible + " unidades disponibles de '"
+                                    + recurso.getNombre() + "' en ese horario");
+                }
+            }
 
             if (!recurso.getActivo()) {
                 throw new BusinessException("El recurso '" + recurso.getNombre() + "' no está disponible");

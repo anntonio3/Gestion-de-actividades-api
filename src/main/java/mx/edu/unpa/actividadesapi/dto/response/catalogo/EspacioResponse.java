@@ -9,14 +9,16 @@ public class EspacioResponse {
     private String descripcion;
     private Integer capacidad;
     private String ubicacion;
+    private Boolean disponible;
 
     public EspacioResponse(Integer idRecurso, String nombre, String descripcion,
-                           Integer capacidad, String ubicacion) {
+                           Integer capacidad, String ubicacion, Boolean disponible) {
         this.idRecurso = idRecurso;
         this.nombre = nombre;
         this.descripcion = descripcion;
         this.capacidad = capacidad;
         this.ubicacion = ubicacion;
+        this.disponible = disponible;
     }
 
 }
