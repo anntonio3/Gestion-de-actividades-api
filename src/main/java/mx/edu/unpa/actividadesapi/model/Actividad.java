@@ -3,6 +3,8 @@ package mx.edu.unpa.actividadesapi.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import mx.edu.unpa.actividadesapi.enums.EstadoActividad;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -52,5 +54,4 @@ public class Actividad {
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 
-    public enum EstadoActividad { PENDIENTE, APROBADA, RECHAZADA }
 }

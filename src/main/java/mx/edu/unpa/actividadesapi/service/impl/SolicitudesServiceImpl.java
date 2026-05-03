@@ -1,24 +1,27 @@
 package mx.edu.unpa.actividadesapi.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import mx.edu.unpa.actividadesapi.dto.SolicitudResponseDTO;
+import mx.edu.unpa.actividadesapi.dto.response.SolicitudResponseDTO;
+import mx.edu.unpa.actividadesapi.enums.EstadoActividad;
 import mx.edu.unpa.actividadesapi.model.Actividad;
 import mx.edu.unpa.actividadesapi.repository.ActividadRepository;
-import mx.edu.unpa.actividadesapi.service.ActividadService;
+import mx.edu.unpa.actividadesapi.service.SolicitudesService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 @Service
 @RequiredArgsConstructor
 
-public class ActividadServiceImpl implements ActividadService {
+public class SolicitudesServiceImpl implements SolicitudesService {
+    // Clase antes llamada ActividadServiceImpl
+
     private final ActividadRepository actividadRepository;
 
     public List<SolicitudResponseDTO> getMisSolicitudes(Integer idProfesor, String estado) {
         List<Actividad> actividades;
 
         if (estado != null && !estado.isBlank()) {
-            Actividad.EstadoActividad estadoEnum = Actividad.EstadoActividad.valueOf(estado.toUpperCase());
+            EstadoActividad estadoEnum = EstadoActividad.valueOf(estado.toUpperCase());
             actividades = actividadRepository
                     .findByIdProfesorAndEstadoOrderByFechaRegistroDesc(idProfesor, estadoEnum);
         } else {
@@ -33,7 +36,7 @@ public class ActividadServiceImpl implements ActividadService {
                         a.getFechaActividad(),
                         a.getHoraInicio(),
                         a.getHoraFin(),
-                        a.getEstado().name(),
+                        a.getEstado(),
                         a.getMotivoRechazo(),
                         a.getFechaRegistro()
                 ))
