@@ -2,6 +2,7 @@ package mx.edu.unpa.actividadesapi.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import mx.edu.unpa.actividadesapi.enums.EstadoActividad;
 
 import java.time.LocalDate;
@@ -11,6 +12,7 @@ import java.util.List;
 
 
 @Data
+@NoArgsConstructor
 @Entity
 @Table(name = "actividades")
 public class Actividad {
