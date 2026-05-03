@@ -13,7 +13,10 @@ public class Categoria {
     @Column(name = "id_categoria")
     private Integer idCategoria;
 
+    @Column(name = "nombre", nullable = false, length = 80)
     private String nombre;
 
+    @Column(name = "descripcion", length = 200)
     private String descripcion;
+
 }

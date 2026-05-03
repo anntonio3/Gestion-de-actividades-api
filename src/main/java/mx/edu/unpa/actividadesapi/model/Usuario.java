@@ -2,6 +2,7 @@ package mx.edu.unpa.actividadesapi.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import mx.edu.unpa.actividadesapi.enums.Rol;
 
 import java.time.LocalDateTime;
 
@@ -42,9 +43,5 @@ public class Usuario {
         this.fechaRegistro = LocalDateTime.now();
     }
 
-    public enum Rol {
-        ADMIN,
-        PROFESOR
-    }
 
 }

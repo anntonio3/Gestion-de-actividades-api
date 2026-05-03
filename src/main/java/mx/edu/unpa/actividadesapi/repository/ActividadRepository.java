@@ -11,7 +11,7 @@ public interface ActividadRepository extends JpaRepository<Actividad, Integer> {
     List<Actividad> findByEstado(EstadoActividad estado);
 
     // Filtrar por tipo además del estado
-    List<Actividad> findByEstadoAndTipo_IdTipo(Actividad.EstadoActividad estado, Integer idTipo);
+    List<Actividad> findByEstadoAndTipo_IdTipo(EstadoActividad estado, Integer idTipo);
 
     // NUEVO: filtrar por categoría (a través de tipo → categoria)
     List<Actividad> findByEstadoAndTipo_Categoria_IdCategoria(
