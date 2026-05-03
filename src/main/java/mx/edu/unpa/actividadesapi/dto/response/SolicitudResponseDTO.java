@@ -13,6 +13,7 @@ import java.time.LocalTime;
 public class SolicitudResponseDTO {
     private Integer idActividad;
     private String nombre;
+    private String descripcion;
     private LocalDate fechaActividad;
     private LocalTime horaInicio;
     private LocalTime horaFin;
