@@ -29,10 +29,10 @@ public class SolicitudesServiceImpl implements SolicitudesService {
         if (estado != null && !estado.isBlank()) {
             EstadoActividad estadoEnum = EstadoActividad.valueOf(estado.toUpperCase());
             actividades = actividadRepository
-                    .findByIdProfesorAndEstadoOrderByFechaRegistroDesc(idProfesor, estadoEnum);
+                    .findByProfesor_IdUsuarioAndEstadoOrderByFechaRegistroDesc(idProfesor, estadoEnum);
         } else {
             actividades = actividadRepository
-                    .findByIdProfesorOrderByFechaRegistroDesc(idProfesor);
+                    .findByProfesor_IdUsuarioOrderByFechaRegistroDesc(idProfesor);
         }
 
         return actividades.stream()

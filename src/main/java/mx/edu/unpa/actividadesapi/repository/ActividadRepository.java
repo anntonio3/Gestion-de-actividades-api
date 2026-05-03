@@ -19,8 +19,6 @@ public interface ActividadRepository extends JpaRepository<Actividad, Integer> {
     List<Actividad> findByEstadoAndTipo_Categoria_IdCategoria(
             EstadoActividad estado, Integer idCategoria);
 
-    List<Actividad> findByIdProfesorOrderByFechaRegistroDesc(Integer idProfesor);
-    // Filtradas por estado
-    List<Actividad> findByIdProfesorAndEstadoOrderByFechaRegistroDesc(
-            Integer idProfesor, EstadoActividad estado);
+    List<Actividad> findByProfesor_IdUsuarioOrderByFechaRegistroDesc(Integer idProfesor);
+    List<Actividad> findByProfesor_IdUsuarioAndEstadoOrderByFechaRegistroDesc(Integer idProfesor, EstadoActividad estado);
 }
