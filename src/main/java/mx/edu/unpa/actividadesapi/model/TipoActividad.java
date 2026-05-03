@@ -19,8 +19,7 @@ public class TipoActividad {
     @Column(name = "descripcion", length = 200)
     private String descripcion;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_categoria", nullable = false)
+    @ManyToOne
+    @JoinColumn(name = "id_categoria")
     private Categoria categoria;
-
 }
