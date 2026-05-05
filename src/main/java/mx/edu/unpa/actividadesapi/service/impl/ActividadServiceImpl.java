@@ -126,7 +126,7 @@ public class ActividadServiceImpl implements ActividadService {
                         request.getHoraFin());
 
                 int ocupada = ocupadas.stream()
-                        .filter(row -> ((Long) row[0]).equals(recurso.getIdRecurso()))
+                        .filter(row -> ((Integer) row[0]).equals(recurso.getIdRecurso()))
                         .mapToInt(row -> ((Number) row[1]).intValue())
                         .findFirst().orElse(0);
 
