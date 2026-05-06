@@ -1,7 +1,9 @@
 package mx.edu.unpa.actividadesapi.exception;
 
+import jakarta.persistence.OptimisticLockException;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -28,6 +30,18 @@ public class GlobalExceptionHandler {
   public ResponseEntity<Map<String, Object>> handleBusiness(BusinessException ex) {
     log.warn("Regla de negocio violada: {}", ex.getMessage());
     return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+  }
+
+  // Optimistic locking: alguien mas modifico la entidad
+  @ExceptionHandler({
+          ConcurrenciaException.class,
+          OptimisticLockException.class,
+          OptimisticLockingFailureException.class
+  })
+  public ResponseEntity<Map<String, Object>> handleConcurrencia(Exception ex) {
+    log.warn("Conflicto de concurrencia: {}", ex.getMessage());
+    return buildResponse(HttpStatus.CONFLICT,
+            "Esta actividad fue modificada por otro usuario. Por favor recarga e intenta de nuevo.");
   }
 
   // Maneja errores de @Valid en los DTOs

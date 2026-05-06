@@ -15,7 +15,7 @@ public class ActividadRecurso {
     private Actividad actividad;
 
     @Id
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_recurso", nullable = false)
     private Recurso recurso;
 

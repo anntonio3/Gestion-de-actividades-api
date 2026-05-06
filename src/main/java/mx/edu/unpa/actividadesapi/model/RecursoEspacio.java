@@ -8,10 +8,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Data
-@Entity
 @EqualsAndHashCode(callSuper = true)
+@Entity
 @Table(name = "recursos_espacio")
 @PrimaryKeyJoinColumn(name = "id_recurso")
+@DiscriminatorValue("ESPACIO")
 public class RecursoEspacio extends Recurso {
 
     @Column(name = "capacidad", nullable = false)
