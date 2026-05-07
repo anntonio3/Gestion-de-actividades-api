@@ -1,6 +1,7 @@
 package mx.edu.unpa.actividadesapi.controller;
 
 import mx.edu.unpa.actividadesapi.dto.ActividadPublicaDTO;
+import mx.edu.unpa.actividadesapi.dto.response.ActividadDetallePublicoResponse;
 import mx.edu.unpa.actividadesapi.model.Categoria;
 import mx.edu.unpa.actividadesapi.service.CalendarioService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,5 +28,11 @@ public class CalendarioController {
     @GetMapping("/categorias")
     public ResponseEntity<List<Categoria>> getCategorias() {
         return ResponseEntity.ok(service.getCategorias());
+    }
+
+    // NUEVO: detalle completo de una actividad pública (modal de detalle)
+    @GetMapping("/publico/{id}")
+    public ResponseEntity<ActividadDetallePublicoResponse> getDetalle(@PathVariable Integer id) {
+        return ResponseEntity.ok(service.getDetalleActividad(id));
     }
 }
