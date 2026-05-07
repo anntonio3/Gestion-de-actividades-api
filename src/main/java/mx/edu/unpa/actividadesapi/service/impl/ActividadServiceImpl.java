@@ -130,7 +130,7 @@ public class ActividadServiceImpl implements ActividadService {
                         .mapToInt(row -> ((Number) row[1]).intValue())
                         .findFirst().orElse(0);
 
-                int disponible = mobiliario.getCantidad() - ocupada;
+                int disponible = mobiliario.getExistencias() - ocupada;
                 if (recursoReq.getCantidadRequerida() > disponible) {
                     throw new BusinessException(
                             "Solo hay " + disponible + " unidades disponibles de '"

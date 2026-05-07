@@ -118,7 +118,7 @@ public class CatalogoServiceImpl implements CatalogoService {
             return todos.stream()
                     .map(m -> new MobiliarioResponse(
                             m.getIdRecurso(), m.getNombre(), m.getDescripcion(),
-                            m.getCantidad(), m.getCantidad()))
+                            m.getExistencias(), m.getExistencias()))
                     .toList();
         }
 
@@ -134,10 +134,10 @@ public class CatalogoServiceImpl implements CatalogoService {
         return todos.stream()
                 .map(m -> {
                     int ocupada = mapa.getOrDefault(m.getIdRecurso(), 0);
-                    int disponible = Math.max(0, m.getCantidad() - ocupada);
+                    int disponible = Math.max(0, m.getExistencias() - ocupada);
                     return new MobiliarioResponse(
                             m.getIdRecurso(), m.getNombre(), m.getDescripcion(),
-                            m.getCantidad(), disponible);
+                            m.getExistencias(), disponible);
                 })
                 .toList();
     }
