@@ -72,6 +72,12 @@ public class Actividad {
     @OneToMany(mappedBy = "actividad", fetch = FetchType.LAZY)
     private List<ActividadImagen> imagenes;
 
+    // Optimistic locking: previene escrituras concurrentes
+    // entre edicion del profesor (US-05) y revision del admin (US-08/US-09).
+    @Version
+    @Column(name = "version", nullable = false)
+    private Integer version;
+
     @PrePersist
     protected void onCreate() {
         this.fechaRegistro = LocalDateTime.now();

@@ -7,6 +7,8 @@ import lombok.Data;
 @Entity
 @Table(name = "recursos")
 @Inheritance(strategy = InheritanceType.JOINED)
+@DiscriminatorColumn(name = "tipo_discriminador", discriminatorType = DiscriminatorType.STRING)
+@DiscriminatorValue("BASE")
 public class Recurso {
 
     @Id
