@@ -14,7 +14,7 @@ public class Visitante {
 
     // UUID generado por el backend, no por la BD.
     @Id
-    @Column(name = "id_visitante", length = 36)
+    @Column(name = "id_visitante", columnDefinition = "CHAR(36)")
     private String idVisitante;
 
     @Column(name = "fecha_creacion", nullable = false, updatable = false)

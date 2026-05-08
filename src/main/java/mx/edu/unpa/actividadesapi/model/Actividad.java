@@ -47,6 +47,9 @@ public class Actividad {
     @Column(name = "hora_fin", nullable = false)
     private LocalTime horaFin;
 
+    @Column(name = "requiere_inscripcion", nullable = false)
+    private Boolean requiereInscripcion = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false)
     private EstadoActividad estado = EstadoActividad.PENDIENTE;
