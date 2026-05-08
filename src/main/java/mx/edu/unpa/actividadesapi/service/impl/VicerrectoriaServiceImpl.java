@@ -291,7 +291,7 @@ public class VicerrectoriaServiceImpl implements VicerrectoriaService {
             d.setCapacidad(espacio.getCapacidad());
             d.setUbicacion(espacio.getUbicacion());
         } else if (r instanceof RecursoMobiliario mob) {
-            d.setCantidadInventario(mob.getCantidad());
+            d.setCantidadInventario(mob.getExistencias());
         }
         return d;
     }
@@ -337,7 +337,7 @@ public class VicerrectoriaServiceImpl implements VicerrectoriaService {
                 }
             } else if (r instanceof RecursoMobiliario mob) {
                 int ocupado = mobiliarioOcupado.getOrDefault(r.getIdRecurso(), 0);
-                int disponible = Math.max(0, mob.getCantidad() - ocupado);
+                int disponible = Math.max(0, mob.getExistencias() - ocupado);
                 if (ar.getCantidadRequerida() > disponible) {
                     SolicitudDetalleResponse.ConflictoRecurso c =
                             new SolicitudDetalleResponse.ConflictoRecurso();
