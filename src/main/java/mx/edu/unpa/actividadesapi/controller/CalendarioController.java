@@ -24,13 +24,13 @@ public class CalendarioController {
         return ResponseEntity.ok(service.getActividadesPublicas(categoria));
     }
 
-    // NUEVO: lista de categorías para los chips del frontend
+    // Lista de categorías para los chips del frontend
     @GetMapping("/categorias")
     public ResponseEntity<List<Categoria>> getCategorias() {
         return ResponseEntity.ok(service.getCategorias());
     }
 
-    // NUEVO: detalle completo de una actividad pública (modal de detalle)
+    // Detalle completo de una actividad pública (modal de detalle)
     @GetMapping("/publico/{id}")
     public ResponseEntity<ActividadDetallePublicoResponse> getDetalle(@PathVariable Integer id) {
         return ResponseEntity.ok(service.getDetalleActividad(id));
