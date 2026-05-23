@@ -53,6 +53,8 @@ public class ActividadServiceImpl implements ActividadService {
     private RecursoEspacioRepository recursoEspacioRepository;
     @Autowired
     private RecursoMobiliarioRepository recursoMobiliarioRepository;
+    @Autowired
+    private CampusRepository campusRepository;
 
 
     @Override
@@ -83,10 +85,16 @@ public class ActividadServiceImpl implements ActividadService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Tipo de actividad no encontrado con id: " + request.getIdTipo()));
 
+        // Validar campus
+        Campus campus = campusRepository.findById(request.getIdCampus())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Campus no encontrado con id: " + request.getIdCampus()));
+
         // 4. Crear y guardar la actividad
         Actividad actividad = new Actividad();
         actividad.setProfesor(profesor);
         actividad.setTipo(tipo);
+        actividad.setCampus(campus);
         actividad.setNombre(request.getNombre());
         actividad.setDescripcion(request.getDescripcion());
         actividad.setFechaActividad(request.getFechaActividad());
@@ -201,6 +209,7 @@ public class ActividadServiceImpl implements ActividadService {
         response.setNombreProfesor(actividad.getProfesor().getNombre()
                 + " " + actividad.getProfesor().getApellidos());
         response.setTipoActividad(actividad.getTipo().getNombre());
+        response.setCampus(actividad.getCampus() != null ? actividad.getCampus().getNombre() : null);
         response.setCategoria(actividad.getTipo().getCategoria().getNombre());
         response.setNombre(actividad.getNombre());
         response.setDescripcion(actividad.getDescripcion());

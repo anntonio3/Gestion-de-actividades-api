@@ -66,4 +66,11 @@ public class CatalogoController {
         log.info("GET /api/recursos/mobiliario fecha={} inicio={} fin={}", fecha, horaInicio, horaFin);
         return ResponseEntity.ok(catalogoService.getMobiliario(fecha, horaInicio, horaFin));
     }
+
+    @GetMapping("/campus")
+    public ResponseEntity<List<CampusResponse>> getCampus() {
+        log.info("GET /api/campus");
+        return ResponseEntity.ok(catalogoService.getCampus());
+    }
+
 }

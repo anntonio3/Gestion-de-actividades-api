@@ -13,4 +13,5 @@ public interface CatalogoService {
     List<CarreraResponse> getCarreras();
     List<EspacioResponse> getEspacios(LocalDate fecha, LocalTime horaInicio, LocalTime horaFin);
     List<MobiliarioResponse> getMobiliario(LocalDate fecha, LocalTime horaInicio, LocalTime horaFin);
+    List<CampusResponse> getCampus();
 }

@@ -17,6 +17,9 @@ public class ActividadRequest {
     @NotNull(message = "El tipo de actividad es obligatorio")
     private Integer idTipo;
 
+    //@NotNull(message = "El campus es obligatorio")
+    private Integer idCampus;
+
     @NotBlank(message = "El nombre es obligatorio")
     @Size(max = 200, message = "El nombre no puede superar 200 caracteres")
     private String nombre;

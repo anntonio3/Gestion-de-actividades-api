@@ -35,6 +35,9 @@ public class CatalogoServiceImpl implements CatalogoService {
     private RecursoEspacioRepository recursoEspacioRepository;
     @Autowired
     private RecursoMobiliarioRepository recursoMobiliarioRepository;
+    @Autowired
+    private CampusRepository campusRepository;
+
 
     @Override
     public List<CategoriaResponse> getCategorias() {
@@ -139,6 +142,13 @@ public class CatalogoServiceImpl implements CatalogoService {
                             m.getIdRecurso(), m.getNombre(), m.getDescripcion(),
                             m.getExistencias(), disponible);
                 })
+                .toList();
+    }
+
+    @Override
+    public List<CampusResponse> getCampus() {
+        return campusRepository.findAll().stream()
+                .map(c -> new CampusResponse(c.getIdCampus(), c.getNombre(), c.getCiudad()))
                 .toList();
     }
 

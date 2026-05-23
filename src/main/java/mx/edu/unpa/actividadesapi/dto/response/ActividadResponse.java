@@ -14,6 +14,7 @@ public class ActividadResponse {
     private Integer idActividad;
     private String nombreProfesor;
     private String tipoActividad;
+    private String campus; // nombre del campus
     private String categoria;
     private String nombre;
     private String descripcion;

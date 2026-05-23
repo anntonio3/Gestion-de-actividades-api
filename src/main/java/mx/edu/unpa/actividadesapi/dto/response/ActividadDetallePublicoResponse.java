@@ -22,6 +22,7 @@ public class ActividadDetallePublicoResponse {
     private LocalTime horaInicio;
     private LocalTime horaFin;
     private String tipo;
+    private String campus; // nombre del campus
     private String categoria;
     private String imagenPortada;
 

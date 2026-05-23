@@ -214,6 +214,7 @@ public class VicerrectoriaServiceImpl implements VicerrectoriaService {
         dto.setNombreProfesor(nombreCompleto(a.getProfesor()));
         dto.setCorreoProfesor(a.getProfesor() != null ? a.getProfesor().getCorreo() : null);
         dto.setTipoActividad(a.getTipo() != null ? a.getTipo().getNombre() : null);
+        dto.setCampus(a.getCampus() != null ? a.getCampus().getNombre() : null);
         dto.setCategoria(a.getTipo() != null && a.getTipo().getCategoria() != null
                 ? a.getTipo().getCategoria().getNombre() : null);
         dto.setFechaActividad(a.getFechaActividad());
@@ -241,6 +242,7 @@ public class VicerrectoriaServiceImpl implements VicerrectoriaService {
         dto.setNombreProfesor(nombreCompleto(a.getProfesor()));
         dto.setCorreoProfesor(a.getProfesor() != null ? a.getProfesor().getCorreo() : null);
         dto.setTipoActividad(a.getTipo() != null ? a.getTipo().getNombre() : null);
+        dto.setCampus(a.getCampus() != null ? a.getCampus().getNombre() : null);
         dto.setCategoria(a.getTipo() != null && a.getTipo().getCategoria() != null
                 ? a.getTipo().getCategoria().getNombre() : null);
         dto.setFechaActividad(a.getFechaActividad());

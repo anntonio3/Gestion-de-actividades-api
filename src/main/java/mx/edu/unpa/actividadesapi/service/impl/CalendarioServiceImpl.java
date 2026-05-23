@@ -78,6 +78,7 @@ public class CalendarioServiceImpl implements CalendarioService {
         dto.setHoraInicio(actividad.getHoraInicio());
         dto.setHoraFin(actividad.getHoraFin());
         dto.setTipo(actividad.getTipo().getNombre());
+        dto.setCampus(actividad.getCampus() != null ? actividad.getCampus().getNombre() : null);
         dto.setCategoria(actividad.getTipo().getCategoria().getNombre());
 
         // Imagen de portada
@@ -180,6 +181,7 @@ public class CalendarioServiceImpl implements CalendarioService {
         dto.setHoraInicio(a.getHoraInicio());
         dto.setHoraFin(a.getHoraFin());
         dto.setTipo(a.getTipo().getNombre());
+        dto.setCampus(a.getCampus() != null ? a.getCampus().getNombre() : null);
         dto.setCategoria(a.getTipo().getCategoria().getNombre()); // NUEVO
 
         // NUEVO: buscar imagen de portada

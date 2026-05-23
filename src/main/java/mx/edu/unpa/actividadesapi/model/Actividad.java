@@ -32,6 +32,11 @@ public class Actividad {
     @JoinColumn(name = "id_tipo", nullable = false)
     private TipoActividad tipo;
 
+    // Relacion con campus donde se realiza la actividad
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_campus", nullable = false)
+    private Campus campus;
+
     @Column(name = "nombre", nullable = false, length = 200)
     private String nombre;
 

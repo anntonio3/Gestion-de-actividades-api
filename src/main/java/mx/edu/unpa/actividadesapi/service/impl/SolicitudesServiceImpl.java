@@ -88,6 +88,7 @@ public class SolicitudesServiceImpl implements SolicitudesService {
         return new SolicitudResponseDTO(
                 a.getIdActividad(),
                 a.getNombre(),
+                a.getCampus().getNombre(),
                 a.getDescripcion(),
                 a.getFechaActividad(),
                 a.getHoraInicio(),

@@ -20,6 +20,7 @@ public class SolicitudListItemResponse {
     private String nombreProfesor;
     private String correoProfesor;
     private String tipoActividad;
+    private String campus; // nombre del campus
     private String categoria;
     private LocalDate fechaActividad;
     private LocalTime horaInicio;
