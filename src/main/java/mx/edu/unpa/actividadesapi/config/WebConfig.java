@@ -40,6 +40,16 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowCredentials(true)
                 .maxAge(3600);
 
+        // CORS para el corcho publico (US-20): cualquier origen, solo lectura
+        // Va DESPUES de /api/** porque Spring evalua en orden y el ultimo gana
+        // para el mismo path
+        registry.addMapping("/api/corcho/**")
+                .allowedOriginPatterns("*")          // patterns, no allowedOrigins, por compat con '*'
+                .allowedMethods("GET", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(false)             // sin credenciales => '*' es valido
+                .maxAge(3600);
+
         // CORS para las imágenes
         registry.addMapping("/uploads/**")
                 .allowedOrigins("http://localhost:4200")
