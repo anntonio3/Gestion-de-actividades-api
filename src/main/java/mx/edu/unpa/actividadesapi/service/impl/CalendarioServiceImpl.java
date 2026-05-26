@@ -183,6 +183,7 @@ public class CalendarioServiceImpl implements CalendarioService {
         dto.setTipo(a.getTipo().getNombre());
         dto.setCampus(a.getCampus() != null ? a.getCampus().getNombre() : null);
         dto.setCategoria(a.getTipo().getCategoria().getNombre()); // NUEVO
+        dto.setRequiereInscripcion(Boolean.TRUE.equals(a.getRequiereInscripcion()));
 
         // NUEVO: buscar imagen de portada
         if (a.getImagenes() != null) {
