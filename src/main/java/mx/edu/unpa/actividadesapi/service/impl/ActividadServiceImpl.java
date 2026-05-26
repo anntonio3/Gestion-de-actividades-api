@@ -97,6 +97,7 @@ public class ActividadServiceImpl implements ActividadService {
         actividad.setCampus(campus);
         actividad.setNombre(request.getNombre());
         actividad.setDescripcion(request.getDescripcion());
+        actividad.setRequiereInscripcion(Boolean.TRUE.equals(request.getRequiereInscripcion()));
         actividad.setFechaActividad(request.getFechaActividad());
         actividad.setHoraInicio(request.getHoraInicio());
         actividad.setHoraFin(request.getHoraFin());
