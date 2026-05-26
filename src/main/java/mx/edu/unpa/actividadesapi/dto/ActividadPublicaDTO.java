@@ -17,4 +17,5 @@ public class ActividadPublicaDTO {
     private String campus; // nombre del campus
     private String categoria;
     private String imagenPortada; // url de la imagen
+    private Boolean requiereInscripcion;
 }

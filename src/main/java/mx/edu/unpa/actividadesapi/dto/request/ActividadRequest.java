@@ -27,6 +27,9 @@ public class ActividadRequest {
     @Size(max = 5000, message = "La descripción es demasiado larga")
     private String descripcion;
 
+    @NotNull
+    private Boolean requiereInscripcion = false;
+
     @NotNull(message = "La fecha de la actividad es obligatoria")
     @FutureOrPresent(message = "La fecha no puede ser en el pasado")
     private LocalDate fechaActividad;

@@ -50,6 +50,14 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowCredentials(false)             // sin credenciales => '*' es valido
                 .maxAge(3600);
 
+        // para Inscripciones
+        registry.addMapping("/api/inscripciones/**")
+                .allowedOrigins("http://localhost:4200")
+                .allowedMethods("GET", "POST", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(true)
+                .maxAge(3600);
+
         // CORS para las imágenes
         registry.addMapping("/uploads/**")
                 .allowedOrigins("http://localhost:4200")
