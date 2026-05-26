@@ -29,6 +29,10 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // incluye BCryptPasswordEncoder.
+    implementation 'org.springframework.security:spring-security-crypto'
+    // JavaMailSender para el envio real de correos.
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
 }
 
 tasks.named('test') {

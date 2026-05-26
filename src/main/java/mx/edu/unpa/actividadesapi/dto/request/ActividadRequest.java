@@ -17,7 +17,7 @@ public class ActividadRequest {
     @NotNull(message = "El tipo de actividad es obligatorio")
     private Integer idTipo;
 
-    //@NotNull(message = "El campus es obligatorio")
+    @NotNull(message = "El campus es obligatorio")
     private Integer idCampus;
 
     @NotBlank(message = "El nombre es obligatorio")
