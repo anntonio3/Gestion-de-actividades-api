@@ -58,6 +58,13 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowCredentials(true)
                 .maxAge(3600);
 
+        registry.addMapping("/api/inscripciones/externo/**")
+                .allowedOrigins("http://localhost:4200")
+                .allowedMethods("GET", "POST", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(true)
+                .maxAge(3600);
+
         // CORS para las imágenes
         registry.addMapping("/uploads/**")
                 .allowedOrigins("http://localhost:4200")
