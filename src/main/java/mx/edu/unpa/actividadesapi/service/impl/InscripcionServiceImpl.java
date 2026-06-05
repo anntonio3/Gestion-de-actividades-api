@@ -31,6 +31,9 @@ public class InscripcionServiceImpl implements InscripcionService {
     private final AlumnoRepository               alumnoRepository;
     private final ActividadImagenRepository      imagenRepository;
 
+    // Repositorio de externos: necesario para sumar su conteo en totalInscritos
+    private final InscripcionExternoRepository   externoRepository;
+
     // ====================================================================
     // Inscribir
     // ====================================================================
@@ -43,13 +46,9 @@ public class InscripcionServiceImpl implements InscripcionService {
         Actividad actividad = obtenerActividadInscribible(idActividad);
         boolean esAlumno = request.getTipoUsuario() == TipoUsuario.ALUMNO;
 
-        // Verificar que no este ya inscrito
         verificarNoInscrito(idActividad, request.getIdActor(), esAlumno);
-
-        // Verificar conflicto de horario
         verificarSinConflictoHorario(actividad, request.getIdActor(), esAlumno);
 
-        // Crear inscripcion
         InscripcionActividad inscripcion = new InscripcionActividad();
         inscripcion.setActividad(actividad);
 
@@ -66,7 +65,9 @@ public class InscripcionServiceImpl implements InscripcionService {
         }
 
         InscripcionActividad guardada = inscripcionRepository.save(inscripcion);
-        int total = inscripcionRepository.countByActividad_IdActividad(idActividad);
+
+        // Suma inscritos del sistema + externos para el conteo unificado
+        int total = conteoTotal(idActividad);
 
         log.info("Inscripcion registrada id={} en actividad={}", guardada.getIdInscripcion(), idActividad);
         return new InscripcionEstadoResponse(idActividad, true, guardada.getIdInscripcion(), total);
@@ -85,7 +86,6 @@ public class InscripcionServiceImpl implements InscripcionService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Actividad no encontrada con id: " + idActividad));
 
-        // Solo se puede cancelar antes de que inicie el evento
         LocalDateTime inicioEvento = actividad.getFechaActividad()
                 .atTime(actividad.getHoraInicio());
         if (LocalDateTime.now().isAfter(inicioEvento)) {
@@ -124,7 +124,10 @@ public class InscripcionServiceImpl implements InscripcionService {
     public InscripcionEstadoResponse obtenerEstado(Integer idActividad, Integer idActor, String tipoUsuario) {
         boolean esAlumno = "ALUMNO".equalsIgnoreCase(tipoUsuario);
         Optional<InscripcionActividad> opt = buscarInscripcionOpcional(idActividad, idActor, esAlumno);
-        int total = inscripcionRepository.countByActividad_IdActividad(idActividad);
+
+        // Conteo unificado: usuarios del sistema + externos
+        int total = conteoTotal(idActividad);
+
         return opt.map(i -> new InscripcionEstadoResponse(idActividad, true, i.getIdInscripcion(), total))
                 .orElse(new InscripcionEstadoResponse(idActividad, false, null, total));
     }
@@ -142,9 +145,9 @@ public class InscripcionServiceImpl implements InscripcionService {
             mapa.put(id, new InscripcionEstadoResponse(id, false, null, 0));
         }
 
-        // Cargar conteos para todas las actividades
+        // Cargar conteo unificado para todas las actividades
         for (Integer id : idsActividades) {
-            int total = inscripcionRepository.countByActividad_IdActividad(id);
+            int total = conteoTotal(id);
             mapa.get(id).setTotalInscritos(total);
         }
 
@@ -163,17 +166,27 @@ public class InscripcionServiceImpl implements InscripcionService {
     }
 
     // ====================================================================
-    // Total inscritos
+    // Total inscritos — SUMA usuarios del sistema + externos
     // ====================================================================
     @Override
     @Transactional(readOnly = true)
     public Integer totalInscritos(Integer idActividad) {
-        return inscripcionRepository.countByActividad_IdActividad(idActividad);
+        return conteoTotal(idActividad);
     }
 
     // ====================================================================
     // Helpers privados
     // ====================================================================
+
+    /**
+     * Suma inscritos del sistema (alumnos/usuarios) mas externos.
+     * Es el unico punto donde se calcula el conteo; todos los metodos lo usan.
+     */
+    private int conteoTotal(Integer idActividad) {
+        int inscritos = inscripcionRepository.countByActividad_IdActividad(idActividad);
+        int externos  = externoRepository.countByActividad_IdActividad(idActividad);
+        return inscritos + externos;
+    }
 
     private Actividad obtenerActividadInscribible(Integer idActividad) {
         Actividad actividad = actividadRepository.findById(idActividad)
@@ -261,7 +274,6 @@ public class InscripcionServiceImpl implements InscripcionService {
                 ? i.getActividad().getCampus().getNombre() : null);
         dto.setFechaInscripcion(i.getFechaInscripcion());
 
-        // Portada
         imagenRepository.findByActividadIdActividadAndEsPortadaTrue(i.getActividad().getIdActividad())
                 .ifPresent(img -> dto.setImagenPortada(img.getUrl()));
 
