@@ -100,9 +100,8 @@ public class CalendarioServiceImpl implements CalendarioService {
 
 
     /**
-     * Busca el espacio asociado a la actividad.
-     * Filtra los recursos consultando RecursoEspacioRepository en lugar de
-     * usar instanceof (que falla con proxies de Hibernate en herencia JOINED).
+     * Busca el espacio asociado a la actividad y lo mapea al DTO público.
+     * Soporta espacios internos (mapa UNPA) y externos (Google Maps).
      */
     private ActividadDetallePublicoResponse.LugarPublicoResponse buscarLugar(Integer idActividad) {
         List<ActividadRecurso> recursos = actividadRecursoRepo
@@ -113,12 +112,10 @@ public class CalendarioServiceImpl implements CalendarioService {
             return null;
         }
 
-        // Sacar los IDs de los recursos asignados
         List<Integer> idsRecursos = recursos.stream()
                 .map(ar -> ar.getRecurso().getIdRecurso())
                 .toList();
 
-        // Consultar cuáles de esos IDs son RecursoEspacio
         List<RecursoEspacio> espacios = recursoEspacioRepo.findAllById(idsRecursos);
 
         if (espacios.isEmpty()) {
@@ -127,23 +124,35 @@ public class CalendarioServiceImpl implements CalendarioService {
         }
 
         if (espacios.size() > 1) {
-            log.warn("Actividad {} tiene {} espacios. Mostrando el primero (regla de negocio: 1 espacio).",
+            log.warn("Actividad {} tiene {} espacios. Mostrando el primero (regla: 1 espacio).",
                     idActividad, espacios.size());
         }
 
         RecursoEspacio espacio = espacios.get(0);
 
-        ActividadDetallePublicoResponse.LugarPublicoResponse lugar = new ActividadDetallePublicoResponse.LugarPublicoResponse();
+        ActividadDetallePublicoResponse.LugarPublicoResponse lugar =
+                new ActividadDetallePublicoResponse.LugarPublicoResponse();
         lugar.setIdEspacio(espacio.getIdRecurso());
         lugar.setNombre(espacio.getNombre());
         lugar.setUbicacion(espacio.getUbicacion());
         lugar.setCapacidad(espacio.getCapacidad());
+        lugar.setEsExterno(espacio.esExterno());
 
-        if (espacio.getPunto() != null) {
+        if (espacio.esInterno() && espacio.getPunto() != null) {
+            // Espacio en el mapa interno de la UNPA
             lugar.setIdPunto(espacio.getPunto().getIdPunto());
             lugar.setEtiquetaPunto(espacio.getPunto().getEtiqueta());
             lugar.setCoordX(espacio.getPunto().getCoordX());
             lugar.setCoordY(espacio.getPunto().getCoordY());
+            log.info("Actividad {} — lugar interno: espacio id={} punto={}",
+                    idActividad, espacio.getIdRecurso(), espacio.getPunto().getEtiqueta());
+        } else if (espacio.esExterno()) {
+            // Espacio externo con coordenadas de Google Maps
+            lugar.setLatitud(espacio.getLatitud());
+            lugar.setLongitud(espacio.getLongitud());
+            lugar.setUrlMaps(espacio.getUrlMaps());
+            log.info("Actividad {} — lugar externo: espacio id={} urlMaps={}",
+                    idActividad, espacio.getIdRecurso(), espacio.getUrlMaps());
         }
 
         return lugar;

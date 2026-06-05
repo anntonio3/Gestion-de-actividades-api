@@ -22,7 +22,11 @@ import java.util.Set;
 
 /**
  * Lógica de negocio para administración de espacios físicos (US-14).
- * El admin gestiona los espacios desde el mapa interactivo de la UNPA.
+ *
+ * Restricción de ubicación:
+ *   - Espacio interno : idPunto presente, campos externos nulos.
+ *   - Espacio externo : latitud + longitud + urlMaps presentes, idPunto nulo.
+ *   - No puede tener ambas ni ninguna.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,14 +34,14 @@ public class EspacioAdminServiceImpl implements EspacioAdminService {
 
     private static final Logger log = LoggerFactory.getLogger(EspacioAdminServiceImpl.class);
 
-    /** Id del tipo de recurso ESPACIO (sembrado en tipos_recurso) */
+    /** Id del tipo de recurso ESPACIO (sembrado en tipos_recurso). */
     private static final Integer TIPO_RECURSO_ESPACIO = 1;
-    /** Id del tipo de recurso MOBILIARIO (sembrado en tipos_recurso) */
+    /** Id del tipo de recurso MOBILIARIO (sembrado en tipos_recurso). */
     private static final Integer TIPO_RECURSO_MOBILIARIO = 2;
 
     private final RecursoEspacioRepository recursoEspacioRepository;
-    private final RecursoRepository recursoRepository;
-    private final MapaPuntoRepository mapaPuntoRepository;
+    private final RecursoRepository        recursoRepository;
+    private final MapaPuntoRepository      mapaPuntoRepository;
     private final EspacioEquipamientoRepository equipamientoRepository;
 
     // ========================================================
@@ -48,13 +52,9 @@ public class EspacioAdminServiceImpl implements EspacioAdminService {
     public List<MapaPuntoResponse> listarPuntosMapa() {
         log.info("Listando puntos del mapa");
 
-        // Cargar todos los puntos
-        List<MapaPunto> puntos = mapaPuntoRepository.findAll();
-
-        // Cargar espacios que ya tienen punto asignado
+        List<MapaPunto>    puntos   = mapaPuntoRepository.findAll();
         List<RecursoEspacio> espacios = recursoEspacioRepository.findAllConPunto();
 
-        // Mapear cada punto con el espacio que le corresponde (si lo hay)
         return puntos.stream().map(punto -> {
             RecursoEspacio espacio = espacios.stream()
                     .filter(e -> e.getPunto() != null
@@ -67,10 +67,10 @@ public class EspacioAdminServiceImpl implements EspacioAdminService {
                     punto.getEtiqueta(),
                     punto.getCoordX(),
                     punto.getCoordY(),
-                    espacio != null ? espacio.getIdRecurso() : null,
-                    espacio != null ? espacio.getNombre() : null,
-                    espacio != null ? espacio.getCapacidad() : null,
-                    espacio != null ? espacio.getActivo() : null
+                    espacio != null ? espacio.getIdRecurso()  : null,
+                    espacio != null ? espacio.getNombre()     : null,
+                    espacio != null ? espacio.getCapacidad()  : null,
+                    espacio != null ? espacio.getActivo()     : null
             );
         }).toList();
     }
@@ -96,49 +96,45 @@ public class EspacioAdminServiceImpl implements EspacioAdminService {
     @Override
     @Transactional
     public EspacioDetalleResponse registrar(EspacioRequest request) {
-        log.info("Registrando espacio en punto={}, nombre='{}'",
-                request.getIdPunto(), request.getNombre());
+        log.info("Registrando espacio nombre='{}' interno={}",
+                request.getNombre(), request.getIdPunto() != null);
 
-        // 1. Validar que el punto del mapa exista
-        MapaPunto punto = mapaPuntoRepository.findById(request.getIdPunto())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "El punto del mapa con id " + request.getIdPunto() + " no existe"));
+        // Valida que la ubicación sea excluyente y completa
+        validarUbicacion(request, null);
 
-        // 2. Validar que el punto no esté ocupado por otro espacio
-        if (recursoEspacioRepository.isPuntoOcupado(request.getIdPunto(), null)) {
-            log.warn("Intento de asignar punto ya ocupado: idPunto={}", request.getIdPunto());
-            throw new BusinessException("El punto seleccionado ya tiene un espacio asignado");
-        }
-
-        // 3. Validar el equipamiento (recursos válidos, sin duplicados, tipo correcto)
-        validarEquipamiento(request.getEquipamiento());
-
-        // 4. Crear el RecursoEspacio (hereda de Recurso, así que los campos
-        //    de la tabla padre y la hija se persisten en cascada por la herencia JOINED)
         RecursoEspacio espacio = new RecursoEspacio();
 
-        // Campos heredados de Recurso
         TipoRecurso tipoEspacio = new TipoRecurso();
         tipoEspacio.setIdTipoRecurso(TIPO_RECURSO_ESPACIO);
         espacio.setTipoRecurso(tipoEspacio);
         espacio.setNombre(request.getNombre());
         espacio.setDescripcion(request.getDescripcion());
         espacio.setActivo(true);
-
-        // Campos propios de RecursoEspacio
         espacio.setCapacidad(request.getCapacidad());
         espacio.setUbicacion(request.getUbicacion());
-        espacio.setPunto(punto);
 
+        if (request.getIdPunto() != null) {
+            // Espacio interno: anclarlo al punto del mapa
+            MapaPunto punto = mapaPuntoRepository.findById(request.getIdPunto())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "El punto del mapa con id " + request.getIdPunto() + " no existe"));
+            espacio.setPunto(punto);
+            log.info("Espacio interno anclado al punto id={}", request.getIdPunto());
+        } else {
+            // Espacio externo: guardar coordenadas de Google Maps
+            espacio.setLatitud(request.getLatitud());
+            espacio.setLongitud(request.getLongitud());
+            espacio.setUrlMaps(request.getUrlMaps());
+            log.info("Espacio externo con coordenadas lat={} lng={}",
+                    request.getLatitud(), request.getLongitud());
+        }
+
+        validarEquipamiento(request.getEquipamiento());
         RecursoEspacio guardado = recursoEspacioRepository.save(espacio);
-        log.info("Espacio creado con id={}", guardado.getIdRecurso());
-
-        // 5. Guardar equipamiento
         guardarEquipamiento(guardado, request.getEquipamiento());
 
-        log.info("Espacio id={} registrado con {} equipamiento(s)",
-                guardado.getIdRecurso(), request.getEquipamiento().size());
-
+        log.info("Espacio registrado con id={} nombre='{}'",
+                guardado.getIdRecurso(), guardado.getNombre());
         return obtenerDetalle(guardado.getIdRecurso());
     }
 
@@ -154,33 +150,42 @@ public class EspacioAdminServiceImpl implements EspacioAdminService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No se encontró el espacio con id: " + idEspacio));
 
-        // Si cambia el punto del mapa, validar que el nuevo no esté ocupado
-        Integer idPuntoActual = espacio.getPunto() != null
-                ? espacio.getPunto().getIdPunto() : null;
+        // Valida ubicación considerando el espacio actual (excluir su propio punto)
+        validarUbicacion(request, idEspacio);
 
-        if (!request.getIdPunto().equals(idPuntoActual)) {
-            MapaPunto nuevoPunto = mapaPuntoRepository.findById(request.getIdPunto())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "El punto del mapa con id " + request.getIdPunto() + " no existe"));
-
-            if (recursoEspacioRepository.isPuntoOcupado(request.getIdPunto(), idEspacio)) {
-                log.warn("Intento de mover espacio {} a punto ocupado {}",
-                        idEspacio, request.getIdPunto());
-                throw new BusinessException("El punto seleccionado ya tiene otro espacio asignado");
-            }
-            espacio.setPunto(nuevoPunto);
-        }
-
-        // Validar equipamiento
-        validarEquipamiento(request.getEquipamiento());
-
-        // Actualizar campos del espacio
+        // Actualizar datos comunes
         espacio.setNombre(request.getNombre());
         espacio.setDescripcion(request.getDescripcion());
         espacio.setCapacidad(request.getCapacidad());
         espacio.setUbicacion(request.getUbicacion());
 
-        // Reescribir equipamiento (más simple que hacer diff)
+        if (request.getIdPunto() != null) {
+            // Cambió o mantiene ubicación interna
+            Integer idPuntoActual = espacio.getPunto() != null
+                    ? espacio.getPunto().getIdPunto() : null;
+
+            if (!request.getIdPunto().equals(idPuntoActual)) {
+                MapaPunto nuevoPunto = mapaPuntoRepository.findById(request.getIdPunto())
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "El punto del mapa con id " + request.getIdPunto() + " no existe"));
+                espacio.setPunto(nuevoPunto);
+                log.info("Punto del mapa actualizado a id={}", request.getIdPunto());
+            }
+            // Limpiar campos externos si antes era externo
+            espacio.setLatitud(null);
+            espacio.setLongitud(null);
+            espacio.setUrlMaps(null);
+        } else {
+            // Cambió o mantiene ubicación externa
+            espacio.setPunto(null);
+            espacio.setLatitud(request.getLatitud());
+            espacio.setLongitud(request.getLongitud());
+            espacio.setUrlMaps(request.getUrlMaps());
+            log.info("Ubicación externa actualizada lat={} lng={}",
+                    request.getLatitud(), request.getLongitud());
+        }
+
+        validarEquipamiento(request.getEquipamiento());
         equipamientoRepository.eliminarPorEspacio(idEspacio);
         equipamientoRepository.flush();
         guardarEquipamiento(espacio, request.getEquipamiento());
@@ -209,23 +214,79 @@ public class EspacioAdminServiceImpl implements EspacioAdminService {
     //  Métodos privados auxiliares
     // ========================================================
 
-    /** Valida que cada equipamiento sea de tipo MOBILIARIO y no haya duplicados. */
-    private void validarEquipamiento(List<EquipamientoRequest> equipamiento) {
-        if (equipamiento == null || equipamiento.isEmpty()) {
-            return;
+    /**
+     * Valida que la ubicación sea excluyente y completa.
+     *
+     * Casos válidos:
+     *   1. idPunto presente, latitud/longitud/urlMaps nulos -> interno
+     *   2. latitud + longitud + urlMaps presentes, idPunto nulo -> externo
+     *
+     * Casos inválidos:
+     *   - Ni interno ni externo (falta todo)
+     *   - Tiene idPunto Y coordenadas externas
+     *   - Tiene coordenadas externas pero le falta latitud, longitud o urlMaps
+     *
+     * @param idEspacioActual null al crear, el id al editar (para excluirlo de la
+     *                        validación de punto ocupado).
+     */
+    private void validarUbicacion(EspacioRequest request, Integer idEspacioActual) {
+        boolean tieneInterno = request.getIdPunto() != null;
+        boolean tieneExterno = request.getLatitud() != null
+                || request.getLongitud() != null
+                || (request.getUrlMaps() != null && !request.getUrlMaps().isBlank());
+
+        if (!tieneInterno && !tieneExterno) {
+            log.warn("Intento de guardar espacio sin ubicación definida");
+            throw new BusinessException(
+                    "Debes indicar una ubicación: selecciona un punto del mapa UNPA "
+                            + "o proporciona coordenadas de Google Maps");
         }
 
-        // Detectar duplicados por idRecurso
-        Set<Integer> recursosVistos = new HashSet<>();
-        for (EquipamientoRequest e : equipamiento) {
-            if (!recursosVistos.add(e.getIdRecurso())) {
+        if (tieneInterno && tieneExterno) {
+            log.warn("Intento de guardar espacio con ubicación interna y externa simultáneas");
+            throw new BusinessException(
+                    "Un espacio no puede tener ubicación interna (mapa UNPA) "
+                            + "y externa (Google Maps) al mismo tiempo");
+        }
+
+        if (tieneExterno) {
+            // Si es externo, los tres campos son obligatorios
+            if (request.getLatitud() == null || request.getLongitud() == null) {
+                log.warn("Espacio externo sin latitud o longitud");
                 throw new BusinessException(
-                        "El recurso con id " + e.getIdRecurso() +
-                                " está duplicado en el equipamiento");
+                        "Para un espacio externo debes proporcionar latitud y longitud");
+            }
+            if (request.getUrlMaps() == null || request.getUrlMaps().isBlank()) {
+                log.warn("Espacio externo sin URL de Google Maps");
+                throw new BusinessException(
+                        "Para un espacio externo debes proporcionar la URL de Google Maps");
             }
         }
 
-        // Validar tipo MOBILIARIO
+        if (tieneInterno) {
+            // Validar que el punto no esté ocupado por otro espacio
+            if (recursoEspacioRepository.isPuntoOcupado(request.getIdPunto(), idEspacioActual)) {
+                log.warn("Punto del mapa id={} ya está ocupado por otro espacio",
+                        request.getIdPunto());
+                throw new BusinessException(
+                        "El punto seleccionado ya tiene un espacio asignado");
+            }
+        }
+    }
+
+    /** Valida que cada recurso del equipamiento sea de tipo MOBILIARIO y sin duplicados. */
+    private void validarEquipamiento(List<EquipamientoRequest> equipamiento) {
+        if (equipamiento == null || equipamiento.isEmpty()) return;
+
+        Set<Integer> vistos = new HashSet<>();
+        for (EquipamientoRequest e : equipamiento) {
+            if (!vistos.add(e.getIdRecurso())) {
+                throw new BusinessException(
+                        "El recurso con id " + e.getIdRecurso()
+                                + " está duplicado en el equipamiento");
+            }
+        }
+
         for (EquipamientoRequest e : equipamiento) {
             Recurso recurso = recursoRepository.findById(e.getIdRecurso())
                     .orElseThrow(() -> new ResourceNotFoundException(
@@ -233,8 +294,8 @@ public class EspacioAdminServiceImpl implements EspacioAdminService {
 
             if (!recurso.getTipoRecurso().getIdTipoRecurso().equals(TIPO_RECURSO_MOBILIARIO)) {
                 throw new BusinessException(
-                        "El recurso '" + recurso.getNombre() +
-                                "' no es de tipo MOBILIARIO y no puede usarse como equipamiento");
+                        "El recurso '" + recurso.getNombre()
+                                + "' no es de tipo MOBILIARIO y no puede usarse como equipamiento");
             }
         }
     }
@@ -242,14 +303,10 @@ public class EspacioAdminServiceImpl implements EspacioAdminService {
     /** Persiste la lista de equipamiento asociada al espacio. */
     private void guardarEquipamiento(RecursoEspacio espacio,
                                      List<EquipamientoRequest> equipamiento) {
-        if (equipamiento == null || equipamiento.isEmpty()) {
-            return;
-        }
+        if (equipamiento == null || equipamiento.isEmpty()) return;
 
         for (EquipamientoRequest e : equipamiento) {
-            // Ya validado en validarEquipamiento, solo recuperamos
-            Recurso recurso = recursoRepository.findById(e.getIdRecurso())
-                    .orElseThrow();
+            Recurso recurso = recursoRepository.findById(e.getIdRecurso()).orElseThrow();
 
             EspacioEquipamiento ee = new EspacioEquipamiento();
             ee.setEspacio(espacio);
@@ -269,23 +326,27 @@ public class EspacioAdminServiceImpl implements EspacioAdminService {
         dto.setCapacidad(espacio.getCapacidad());
         dto.setUbicacion(espacio.getUbicacion());
         dto.setActivo(espacio.getActivo());
+        dto.setEsExterno(espacio.esExterno());
 
-        if (espacio.getPunto() != null) {
+        if (espacio.esInterno() && espacio.getPunto() != null) {
             dto.setIdPunto(espacio.getPunto().getIdPunto());
             dto.setEtiquetaPunto(espacio.getPunto().getEtiqueta());
             dto.setCoordX(espacio.getPunto().getCoordX());
             dto.setCoordY(espacio.getPunto().getCoordY());
+        } else if (espacio.esExterno()) {
+            dto.setLatitud(espacio.getLatitud());
+            dto.setLongitud(espacio.getLongitud());
+            dto.setUrlMaps(espacio.getUrlMaps());
         }
 
-        List<EquipamientoResponse> equipamiento = espacio.getEquipamiento().stream()
+        List<EquipamientoResponse> equip = espacio.getEquipamiento().stream()
                 .map(e -> new EquipamientoResponse(
                         e.getRecurso().getIdRecurso(),
                         e.getRecurso().getNombre(),
                         e.getCantidad(),
                         e.getCaracteristicas()))
                 .toList();
-
-        dto.setEquipamiento(equipamiento);
+        dto.setEquipamiento(equip);
         return dto;
     }
 }

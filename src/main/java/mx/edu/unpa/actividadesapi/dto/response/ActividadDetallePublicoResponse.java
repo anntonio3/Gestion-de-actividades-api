@@ -14,7 +14,7 @@ import java.util.List;
 @Data
 public class ActividadDetallePublicoResponse {
 
-    // Datos basicos
+    // Datos básicos
     private Integer id;
     private String nombre;
     private String descripcion;
@@ -22,11 +22,11 @@ public class ActividadDetallePublicoResponse {
     private LocalTime horaInicio;
     private LocalTime horaFin;
     private String tipo;
-    private String campus; // nombre del campus
+    private String campus;
     private String categoria;
     private String imagenPortada;
 
-    // Lugar (un solo espacio por actividad - regla de negocio)
+    // Lugar (un solo espacio por actividad — regla de negocio)
     private LugarPublicoResponse lugar;
 
     // Organizadores (carreras y/o departamentos)
@@ -41,16 +41,30 @@ public class ActividadDetallePublicoResponse {
         private String ubicacion;
         private Integer capacidad;
 
-        // Coordenadas para el mapa (null si el espacio no esta anclado a un punto)
+        // Ubicación interna (mapa UNPA) — nulo si el espacio es externo
         private Integer idPunto;
         private String etiquetaPunto;
         private BigDecimal coordX;
         private BigDecimal coordY;
+
+        // Ubicación externa (Google Maps) — nulo si el espacio es interno
+        private BigDecimal latitud;
+        private BigDecimal longitud;
+
+        /**
+         * URL directa de Google Maps para el lugar externo.
+         * Null si el espacio está en el mapa interno de la UNPA.
+         * El frontend muestra un enlace "Ver en Google Maps" cuando este campo tiene valor.
+         */
+        private String urlMaps;
+
+        /** True si el espacio es externo a la institución. */
+        private Boolean esExterno;
     }
 
     @Data
     public static class OrganizadorPublicoResponse {
         private String nombre;
-        private String tipo;  // "CARRERA" o "DEPARTAMENTO"
+        private String tipo; // "CARRERA" o "DEPARTAMENTO"
     }
 }
