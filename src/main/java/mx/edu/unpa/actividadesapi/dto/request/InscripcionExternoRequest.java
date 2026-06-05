@@ -27,7 +27,7 @@ public class InscripcionExternoRequest {
     @Size(max = 150, message = "La procedencia no puede superar 150 caracteres")
     private String procedencia;
 
-    // Correo opcional; si viene, se valida formato y se usa para evitar duplicados
+    @NotBlank(message = "El correo es obligatorio")
     @Email(message = "El formato del correo no es valido")
     @Size(max = 150, message = "El correo no puede superar 150 caracteres")
     private String correo;
