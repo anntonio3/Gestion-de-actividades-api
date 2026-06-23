@@ -67,6 +67,20 @@ public class GlobalExceptionHandler {
     return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor");
   }
 
+  // US-26: conflicto al destacar cuando ya hay otro activo sin confirmar reemplazo
+  @ExceptionHandler(DestacadoConflictoException.class)
+  public ResponseEntity<Map<String, Object>> handleDestacadoConflicto(DestacadoConflictoException ex) {
+    log.warn("Conflicto de destacado: {}", ex.getMessage());
+    Map<String, Object> body = new HashMap<>();
+    body.put("timestamp", LocalDateTime.now());
+    body.put("status", HttpStatus.CONFLICT.value());
+    body.put("mensaje", ex.getMessage());
+    // Datos del destacado actual para que el front arme la advertencia de reemplazo
+    body.put("idDestacadoActual", ex.getIdActual());
+    body.put("nombreDestacadoActual", ex.getNombreActual());
+    return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+  }
+
   private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String mensaje) {
     Map<String, Object> body = new HashMap<>();
     body.put("timestamp", LocalDateTime.now());

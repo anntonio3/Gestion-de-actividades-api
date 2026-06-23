@@ -2,6 +2,7 @@ package mx.edu.unpa.actividadesapi.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import mx.edu.unpa.actividadesapi.enums.NivelImportancia;
 
 @Data
 @Entity
@@ -18,6 +19,11 @@ public class TipoActividad {
 
     @Column(name = "descripcion", length = 200)
     private String descripcion;
+
+    // US-25: nivel de importancia para sugerir destacado al aprobar
+    @Enumerated(EnumType.STRING)
+    @Column(name = "nivel_importancia", nullable = false)
+    private NivelImportancia nivelImportancia = NivelImportancia.NORMAL;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_categoria", nullable = false)

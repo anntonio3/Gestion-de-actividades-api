@@ -3,6 +3,7 @@ package mx.edu.unpa.actividadesapi.service.impl;
 import jakarta.transaction.Transactional;
 import mx.edu.unpa.actividadesapi.dto.ActividadPublicaDTO;
 import mx.edu.unpa.actividadesapi.dto.response.ActividadDetallePublicoResponse;
+import mx.edu.unpa.actividadesapi.dto.response.EventoDestacadoResponse;
 import mx.edu.unpa.actividadesapi.enums.EstadoActividad;
 import mx.edu.unpa.actividadesapi.exception.BusinessException;
 import mx.edu.unpa.actividadesapi.exception.ResourceNotFoundException;
@@ -95,6 +96,55 @@ public class CalendarioServiceImpl implements CalendarioService {
         // Organizadores
         dto.setOrganizadores(buscarOrganizadores(idActividad));
 
+        return dto;
+    }
+
+
+    // ============================================================
+    //  US-27: Evento destacado para el banner publico
+    // ============================================================
+    @Override
+    @Transactional
+    public EventoDestacadoResponse getEventoDestacado() {
+        Actividad destacada = actividadRepo.findByDestacadoActivoTrue().orElse(null);
+
+        if (destacada == null) {
+            log.info("US-27: no hay evento destacado activo");
+            return null;
+        }
+
+        // Defensa: solo mostramos destacados que sigan aprobados
+        if (destacada.getEstado() != EstadoActividad.APROBADA) {
+            log.warn("US-27: destacado id={} no esta APROBADA, se omite",
+                    destacada.getIdActividad());
+            return null;
+        }
+
+        EventoDestacadoResponse dto = new EventoDestacadoResponse();
+        dto.setId(destacada.getIdActividad());
+        dto.setNombre(destacada.getNombre());
+        dto.setDescripcion(destacada.getDescripcion());
+        dto.setFechaActividad(destacada.getFechaActividad());
+        dto.setHoraInicio(destacada.getHoraInicio());
+        dto.setHoraFin(destacada.getHoraFin());
+        dto.setTipo(destacada.getTipo().getNombre());
+        dto.setCategoria(destacada.getTipo().getCategoria().getNombre());
+
+        if (destacada.getImagenes() != null) {
+            destacada.getImagenes().stream()
+                    .filter(ActividadImagen::getEsPortada)
+                    .findFirst()
+                    .ifPresent(img -> dto.setImagenPortada(img.getUrl()));
+        }
+
+        // Lugar (reutiliza la busqueda de espacio del detalle publico)
+        var lugar = buscarLugar(destacada.getIdActividad());
+        if (lugar != null) {
+            dto.setLugar(lugar.getNombre());
+            dto.setCapacidad(lugar.getCapacidad());
+        }
+
+        log.info("US-27: devolviendo destacado id={}", destacada.getIdActividad());
         return dto;
     }
 

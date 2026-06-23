@@ -1,13 +1,17 @@
 package mx.edu.unpa.actividadesapi.service.impl;
 
 import mx.edu.unpa.actividadesapi.dto.request.AprobarActividadRequest;
+import mx.edu.unpa.actividadesapi.dto.request.DestacarRequest;
 import mx.edu.unpa.actividadesapi.dto.request.RechazarActividadRequest;
+import mx.edu.unpa.actividadesapi.dto.response.DestacarResponse;
 import mx.edu.unpa.actividadesapi.dto.response.vicerrectoria.SolicitudDecididaResponse;
 import mx.edu.unpa.actividadesapi.dto.response.vicerrectoria.SolicitudDetalleResponse;
 import mx.edu.unpa.actividadesapi.dto.response.vicerrectoria.SolicitudListItemResponse;
 import mx.edu.unpa.actividadesapi.enums.EstadoActividad;
+import mx.edu.unpa.actividadesapi.enums.NivelImportancia;
 import mx.edu.unpa.actividadesapi.enums.Rol;
 import mx.edu.unpa.actividadesapi.exception.BusinessException;
+import mx.edu.unpa.actividadesapi.exception.DestacadoConflictoException;
 import mx.edu.unpa.actividadesapi.exception.ResourceNotFoundException;
 import mx.edu.unpa.actividadesapi.model.*;
 import mx.edu.unpa.actividadesapi.repository.*;
@@ -107,7 +111,16 @@ public class VicerrectoriaServiceImpl implements VicerrectoriaService {
         Actividad guardada = actividadRepository.save(actividad);
         log.info("Actividad id={} APROBADA por admin id={}", idActividad, admin.getIdUsuario());
 
-        return toDecidida(guardada);
+        SolicitudDecididaResponse dto = toDecidida(guardada);
+        // US-25: sugerir destacado solo si el tipo es DESTACADO.
+        // El front decide si abre el modal; el reemplazo se confirma aparte.
+        boolean tipoDestacado = guardada.getTipo() != null
+                && guardada.getTipo().getNivelImportancia() == NivelImportancia.DESTACADO;
+        dto.setSugerirDestacado(tipoDestacado);
+        if (tipoDestacado) {
+            log.info("US-25: actividad id={} es de tipo DESTACADO, se sugiere destacar", idActividad);
+        }
+        return dto;
     }
 
     // ====================================================================
@@ -200,6 +213,102 @@ public class VicerrectoriaServiceImpl implements VicerrectoriaService {
         String prof = (a.getProfesor() == null ? "" :
                 (a.getProfesor().getNombre() + " " + a.getProfesor().getApellidos())).toLowerCase();
         return nombre.contains(q) || prof.contains(q);
+    }
+
+
+    // ====================================================================
+    // US-26: Destacar / quitar destacado
+    // ====================================================================
+
+    @Override
+    @Transactional
+    public DestacarResponse destacar(Integer idActividad, DestacarRequest request) {
+        log.info("US-26: destacar actividad id={} por admin id={} confirmarReemplazo={}",
+                idActividad, request.getIdAdmin(), request.getConfirmarReemplazo());
+
+        Usuario admin = obtenerAdminValido(request.getIdAdmin());
+
+        Actividad actividad = actividadRepository.findById(idActividad)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Actividad no encontrada con id: " + idActividad));
+
+        // Solo se destacan actividades aprobadas
+        if (actividad.getEstado() != EstadoActividad.APROBADA) {
+            throw new BusinessException(
+                    "Solo se pueden destacar actividades aprobadas. Estado actual: "
+                            + actividad.getEstado());
+        }
+
+        // Si ya esta destacada, no hay nada que hacer
+        if (Boolean.TRUE.equals(actividad.getDestacadoActivo())) {
+            log.info("Actividad id={} ya estaba destacada", idActividad);
+            return toDestacarResponse(actividad);
+        }
+
+        // Verificar si hay otro destacado activo
+        Optional<Actividad> destacadoActual = actividadRepository.findByDestacadoActivoTrue();
+
+        if (destacadoActual.isPresent()) {
+            Actividad actual = destacadoActual.get();
+            // El front debe confirmar el reemplazo (decision de diseno del ticket)
+            if (!Boolean.TRUE.equals(request.getConfirmarReemplazo())) {
+                log.warn("US-26: ya existe destacado activo id={} y no se confirmo reemplazo",
+                        actual.getIdActividad());
+                throw new DestacadoConflictoException(
+                        actual.getIdActividad(), actual.getNombre());
+            }
+            // Reemplazo confirmado: desactivar el anterior
+            actual.setDestacadoActivo(false);
+            actual.setDestacadoPor(null);
+            actual.setFechaDestacado(null);
+            actividadRepository.save(actual);
+            // Flush para liberar el indice unico antes de activar el nuevo
+            actividadRepository.flush();
+            log.info("US-26: destacado anterior id={} desactivado", actual.getIdActividad());
+        }
+
+        actividad.setDestacadoActivo(true);
+        actividad.setDestacadoPor(admin);
+        actividad.setFechaDestacado(LocalDateTime.now());
+        Actividad guardada = actividadRepository.save(actividad);
+
+        log.info("US-26: actividad id={} marcada como destacada por admin id={}",
+                idActividad, admin.getIdUsuario());
+        return toDestacarResponse(guardada);
+    }
+
+    @Override
+    @Transactional
+    public void quitarDestacado(Integer idActividad, Integer idAdmin) {
+        log.info("US-26: quitar destacado de actividad id={} por admin id={}",
+                idActividad, idAdmin);
+
+        obtenerAdminValido(idAdmin);
+
+        Actividad actividad = actividadRepository.findById(idActividad)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Actividad no encontrada con id: " + idActividad));
+
+        if (!Boolean.TRUE.equals(actividad.getDestacadoActivo())) {
+            log.info("Actividad id={} no estaba destacada, nada que quitar", idActividad);
+            return;
+        }
+
+        actividad.setDestacadoActivo(false);
+        actividad.setDestacadoPor(null);
+        actividad.setFechaDestacado(null);
+        actividadRepository.save(actividad);
+        log.info("US-26: destacado quitado de actividad id={}", idActividad);
+    }
+
+    private DestacarResponse toDestacarResponse(Actividad a) {
+        DestacarResponse dto = new DestacarResponse();
+        dto.setIdActividad(a.getIdActividad());
+        dto.setNombre(a.getNombre());
+        dto.setDestacadoActivo(a.getDestacadoActivo());
+        dto.setNombreAdmin(nombreCompleto(a.getDestacadoPor()));
+        dto.setFechaDestacado(a.getFechaDestacado());
+        return dto;
     }
 
     // ====================================================================

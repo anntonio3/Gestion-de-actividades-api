@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ActividadRepository extends JpaRepository<Actividad, Integer> {
@@ -77,5 +78,8 @@ public interface ActividadRepository extends JpaRepository<Actividad, Integer> {
             @Param("horaInicio") LocalTime horaInicio,
             @Param("horaFin") LocalTime horaFin
     );
+
+    // US-27: actividad destacada actualmente activa (solo puede haber una)
+    Optional<Actividad> findByDestacadoActivoTrue();
 
 }

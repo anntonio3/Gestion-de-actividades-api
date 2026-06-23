@@ -76,7 +76,20 @@ public class Actividad {
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 
-    // NUEVO
+    // US-26: Evento destacado
+    // Solo una actividad puede tener destacado_activo = true a la vez
+    // (garantizado por indice funcional uq_un_destacado_activo en BD).
+    @Column(name = "destacado_activo", nullable = false)
+    private Boolean destacadoActivo = false;
+
+    // Admin que confirmo el destacado (US-26)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_destacado_por", nullable = true)
+    private Usuario destacadoPor;
+
+    @Column(name = "fecha_destacado")
+    private LocalDateTime fechaDestacado;
+
     @OneToMany(mappedBy = "actividad", fetch = FetchType.LAZY)
     private List<ActividadImagen> imagenes;
 

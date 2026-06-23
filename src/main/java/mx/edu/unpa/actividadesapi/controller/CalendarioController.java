@@ -2,6 +2,7 @@ package mx.edu.unpa.actividadesapi.controller;
 
 import mx.edu.unpa.actividadesapi.dto.ActividadPublicaDTO;
 import mx.edu.unpa.actividadesapi.dto.response.ActividadDetallePublicoResponse;
+import mx.edu.unpa.actividadesapi.dto.response.EventoDestacadoResponse;
 import mx.edu.unpa.actividadesapi.model.Categoria;
 import mx.edu.unpa.actividadesapi.service.CalendarioService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,5 +35,15 @@ public class CalendarioController {
     @GetMapping("/publico/{id}")
     public ResponseEntity<ActividadDetallePublicoResponse> getDetalle(@PathVariable Integer id) {
         return ResponseEntity.ok(service.getDetalleActividad(id));
+    }
+
+    // US-27: Evento destacado activo para el banner publico.
+    // 204 si no hay ninguno (el front no muestra el banner).
+    @GetMapping("/destacado")
+    public ResponseEntity<EventoDestacadoResponse> getDestacado() {
+        EventoDestacadoResponse destacado = service.getEventoDestacado();
+        return destacado != null
+                ? ResponseEntity.ok(destacado)
+                : ResponseEntity.noContent().build();
     }
 }

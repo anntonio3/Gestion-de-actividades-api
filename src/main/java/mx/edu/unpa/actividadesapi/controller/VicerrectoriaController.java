@@ -2,7 +2,9 @@ package mx.edu.unpa.actividadesapi.controller;
 
 import jakarta.validation.Valid;
 import mx.edu.unpa.actividadesapi.dto.request.AprobarActividadRequest;
+import mx.edu.unpa.actividadesapi.dto.request.DestacarRequest;
 import mx.edu.unpa.actividadesapi.dto.request.RechazarActividadRequest;
+import mx.edu.unpa.actividadesapi.dto.response.DestacarResponse;
 import mx.edu.unpa.actividadesapi.dto.response.vicerrectoria.SolicitudDecididaResponse;
 import mx.edu.unpa.actividadesapi.dto.response.vicerrectoria.SolicitudDetalleResponse;
 import mx.edu.unpa.actividadesapi.dto.response.vicerrectoria.SolicitudListItemResponse;
@@ -77,5 +79,31 @@ public class VicerrectoriaController {
             @Valid @RequestBody RechazarActividadRequest request) {
         log.info("POST /api/vicerrectoria/solicitudes/{}/rechazar admin={}", id, request.getIdAdmin());
         return ResponseEntity.ok(vicerrectoriaService.rechazar(id, request));
+    }
+
+    /**
+     * US-26: Marca una actividad aprobada como destacada (doble confirmacion en front).
+     * Si ya hay otro destacado y confirmarReemplazo=false, responde 409 con los datos del actual.
+     * POST /api/vicerrectoria/solicitudes/{id}/destacar
+     */
+    @PostMapping("/{id}/destacar")
+    public ResponseEntity<DestacarResponse> destacar(
+            @PathVariable Integer id,
+            @Valid @RequestBody DestacarRequest request) {
+        log.info("POST /api/vicerrectoria/solicitudes/{}/destacar admin={}", id, request.getIdAdmin());
+        return ResponseEntity.ok(vicerrectoriaService.destacar(id, request));
+    }
+
+    /**
+     * US-26: Quita el destacado de una actividad.
+     * DELETE /api/vicerrectoria/solicitudes/{id}/destacar?idAdmin=X
+     */
+    @DeleteMapping("/{id}/destacar")
+    public ResponseEntity<Void> quitarDestacado(
+            @PathVariable Integer id,
+            @RequestParam Integer idAdmin) {
+        log.info("DELETE /api/vicerrectoria/solicitudes/{}/destacar admin={}", id, idAdmin);
+        vicerrectoriaService.quitarDestacado(id, idAdmin);
+        return ResponseEntity.noContent().build();
     }
 }

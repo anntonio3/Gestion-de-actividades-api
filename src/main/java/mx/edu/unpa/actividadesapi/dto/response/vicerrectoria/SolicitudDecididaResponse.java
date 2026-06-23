@@ -17,4 +17,8 @@ public class SolicitudDecididaResponse {
     private LocalDateTime fechaRevision;
     private String nombreVicerrector;
     private Integer version;
+
+    // US-25: true si el tipo de la actividad es DESTACADO y conviene
+    // sugerir al admin marcarla como destacada tras aprobarla.
+    private Boolean sugerirDestacado = false;
 }

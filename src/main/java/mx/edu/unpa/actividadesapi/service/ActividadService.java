@@ -6,4 +6,5 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface ActividadService {
     ActividadResponse registrarActividad(ActividadRequest request, MultipartFile portada);
+
 }
