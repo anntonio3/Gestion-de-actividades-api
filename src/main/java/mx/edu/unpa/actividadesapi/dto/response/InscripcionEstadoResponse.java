@@ -17,4 +17,18 @@ public class InscripcionEstadoResponse {
     private Boolean inscrito;          // true si el actor ya esta inscrito
     private Integer idInscripcion;     // null si no esta inscrito
     private Integer totalInscritos;
+
+    private Integer aforo;
+
+    private Integer lugaresDisponibles;
+
+    private Boolean cupoLleno = false;
+
+    public InscripcionEstadoResponse(Integer idActividad, Boolean inscrito,
+                                     Integer idInscripcion, Integer totalInscritos) {
+        this.idActividad = idActividad;
+        this.inscrito = inscrito;
+        this.idInscripcion = idInscripcion;
+        this.totalInscritos = totalInscritos;
+    }
 }

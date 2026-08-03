@@ -32,6 +32,17 @@ public class ActividadDetallePublicoResponse {
     // Organizadores (carreras y/o departamentos)
     private List<OrganizadorPublicoResponse> organizadores;
 
+    // ===== US-29: indicador de cupo / aforo =====
+    private Boolean requiereInscripcion;
+    private Integer totalInscritos;
+
+    // Lugares disponibles restantes (capacidad del lugar - totalInscritos, minimo 0).
+    // Null si la actividad no tiene un espacio asignado o no define limite de aforo.
+    private Integer lugaresDisponibles;
+
+    // true cuando totalInscritos >= capacidad del lugar (y este define limite de aforo).
+    private Boolean cupoLleno;
+
     // ===== Sub-DTOs internos =====
 
     @Data

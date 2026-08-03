@@ -38,6 +38,15 @@ public class InscripcionExternoServiceImpl implements InscripcionExternoService 
     @Autowired
     private VisitanteRepository visitanteRepository;
 
+    @Autowired
+    private mx.edu.unpa.actividadesapi.repository.ActividadRecursoRepository actividadRecursoRepository;
+
+    @Autowired
+    private mx.edu.unpa.actividadesapi.repository.RecursoEspacioRepository recursoEspacioRepository;
+
+    @Autowired
+    private mx.edu.unpa.actividadesapi.repository.InscripcionActividadRepository inscripcionRepository;
+
     // ====================================================================
     // Inscribir
     // ====================================================================
@@ -84,6 +93,7 @@ public class InscripcionExternoServiceImpl implements InscripcionExternoService 
         if (idVisitante != null && !idVisitante.isBlank()) {
             visitante = asegurarVisitante(idVisitante);
         }
+        verificarCupoDisponible(idActividad);
 
         InscripcionExterno externo = new InscripcionExterno();
         externo.setActividad(actividad);
@@ -183,6 +193,33 @@ public class InscripcionExternoServiceImpl implements InscripcionExternoService 
             throw new BusinessException("Esta actividad no requiere inscripcion formal.");
         }
         return actividad;
+    }
+
+    /**
+     * US-29: bloquea la inscripcion externa si el cupo del evento ya esta lleno.
+     */
+    private void verificarCupoDisponible(Integer idActividad) {
+        var recursos = actividadRecursoRepository.findByActividadIdActividad(idActividad);
+        if (recursos.isEmpty()) return;
+
+        var idsRecursos = recursos.stream()
+                .map(ar -> ar.getRecurso().getIdRecurso())
+                .toList();
+
+        var espacios = recursoEspacioRepository.findAllById(idsRecursos);
+        if (espacios.isEmpty()) return;
+
+        Integer aforo = espacios.get(0).getCapacidad();
+        if (aforo == null || aforo <= 0) return;
+
+        int totalInternos = inscripcionRepository.countByActividad_IdActividad(idActividad);
+        int totalExternos = externoRepository.countByActividad_IdActividad(idActividad);
+        int total = totalInternos + totalExternos;
+
+        if (total >= aforo) {
+            log.warn("Cupo lleno para actividad={} (aforo={}, inscritos={})", idActividad, aforo, total);
+            throw new BusinessException("El cupo de esta actividad esta lleno.");
+        }
     }
 
     /**

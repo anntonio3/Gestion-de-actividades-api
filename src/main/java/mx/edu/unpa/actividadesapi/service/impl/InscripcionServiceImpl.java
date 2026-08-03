@@ -34,6 +34,9 @@ public class InscripcionServiceImpl implements InscripcionService {
     // Repositorio de externos: necesario para sumar su conteo en totalInscritos
     private final InscripcionExternoRepository   externoRepository;
 
+    private final ActividadRecursoRepository     actividadRecursoRepository;
+    private final RecursoEspacioRepository       recursoEspacioRepository;
+
     // ====================================================================
     // Inscribir
     // ====================================================================
@@ -48,6 +51,8 @@ public class InscripcionServiceImpl implements InscripcionService {
 
         verificarNoInscrito(idActividad, request.getIdActor(), esAlumno);
         verificarSinConflictoHorario(actividad, request.getIdActor(), esAlumno);
+        verificarCupoDisponible(idActividad);
+
 
         InscripcionActividad inscripcion = new InscripcionActividad();
         inscripcion.setActividad(actividad);
@@ -67,10 +72,14 @@ public class InscripcionServiceImpl implements InscripcionService {
         InscripcionActividad guardada = inscripcionRepository.save(inscripcion);
 
         // Suma inscritos del sistema + externos para el conteo unificado
+
         int total = conteoTotal(idActividad);
 
         log.info("Inscripcion registrada id={} en actividad={}", guardada.getIdInscripcion(), idActividad);
-        return new InscripcionEstadoResponse(idActividad, true, guardada.getIdInscripcion(), total);
+        InscripcionEstadoResponse estado = new InscripcionEstadoResponse(idActividad, true, guardada.getIdInscripcion(), total);
+        aplicarCupo(estado, idActividad);
+        return estado;
+
     }
 
     // ====================================================================
@@ -128,8 +137,11 @@ public class InscripcionServiceImpl implements InscripcionService {
         // Conteo unificado: usuarios del sistema + externos
         int total = conteoTotal(idActividad);
 
-        return opt.map(i -> new InscripcionEstadoResponse(idActividad, true, i.getIdInscripcion(), total))
+        InscripcionEstadoResponse estado = opt.map(i -> new InscripcionEstadoResponse(idActividad, true, i.getIdInscripcion(), total))
                 .orElse(new InscripcionEstadoResponse(idActividad, false, null, total));
+        aplicarCupo(estado, idActividad);
+        return estado;
+
     }
 
     // ====================================================================
@@ -149,6 +161,7 @@ public class InscripcionServiceImpl implements InscripcionService {
         for (Integer id : idsActividades) {
             int total = conteoTotal(id);
             mapa.get(id).setTotalInscritos(total);
+            aplicarCupo(mapa.get(id), id);
         }
 
         // Marcar las que el actor ya tiene
@@ -187,6 +200,47 @@ public class InscripcionServiceImpl implements InscripcionService {
         int externos  = externoRepository.countByActividad_IdActividad(idActividad);
         return inscritos + externos;
     }
+    /**
+     * US-29: obtiene la capacidad (aforo) del espacio asignado a la actividad.
+     * Retorna null si la actividad no tiene un espacio asignado o el espacio
+     * no define un limite de aforo valido (capacidad <= 0).
+     */
+    private Integer obtenerAforo(Integer idActividad) {
+        List<ActividadRecurso> recursos = actividadRecursoRepository.findByActividadIdActividad(idActividad);
+        if (recursos.isEmpty()) {
+            return null;
+        }
+
+        List<Integer> idsRecursos = recursos.stream()
+                .map(ar -> ar.getRecurso().getIdRecurso())
+                .toList();
+
+        List<RecursoEspacio> espacios = recursoEspacioRepository.findAllById(idsRecursos);
+        if (espacios.isEmpty()) {
+            return null;
+        }
+
+        Integer capacidad = espacios.get(0).getCapacidad();
+        return (capacidad != null && capacidad > 0) ? capacidad : null;
+    }
+    /**
+     * US-29: completa los campos de cupo (aforo, lugaresDisponibles, cupoLleno)
+     * de un InscripcionEstadoResponse a partir del total de inscritos.
+     */
+    private void aplicarCupo(InscripcionEstadoResponse estado, Integer idActividad) {
+        Integer aforo = obtenerAforo(idActividad);
+        estado.setAforo(aforo);
+
+        if (aforo == null) {
+            estado.setLugaresDisponibles(null);
+            estado.setCupoLleno(false);
+            return;
+        }
+
+        int total = estado.getTotalInscritos() != null ? estado.getTotalInscritos() : 0;
+        estado.setLugaresDisponibles(Math.max(aforo - total, 0));
+        estado.setCupoLleno(total >= aforo);
+    }
 
     private Actividad obtenerActividadInscribible(Integer idActividad) {
         Actividad actividad = actividadRepository.findById(idActividad)
@@ -219,6 +273,20 @@ public class InscripcionServiceImpl implements InscripcionService {
         if (yaInscrito) {
             log.warn("Actor={} ya esta inscrito en actividad={}", idActor, idActividad);
             throw new BusinessException("Ya estas inscrito en esta actividad.");
+        }
+    }
+    /**
+     * US-29: bloquea la inscripcion si el cupo del evento ya esta lleno.
+     */
+    private void verificarCupoDisponible(Integer idActividad) {
+        Integer aforo = obtenerAforo(idActividad);
+        if (aforo == null) {
+            return; // sin limite de aforo
+        }
+        int total = conteoTotal(idActividad);
+        if (total >= aforo) {
+            log.warn("Cupo lleno para actividad={} (aforo={}, inscritos={})", idActividad, aforo, total);
+            throw new BusinessException("El cupo de esta actividad esta lleno.");
         }
     }
 

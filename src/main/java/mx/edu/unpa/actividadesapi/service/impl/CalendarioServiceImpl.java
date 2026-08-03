@@ -33,6 +33,10 @@ public class CalendarioServiceImpl implements CalendarioService {
     private ActividadOrganizadorRepository organizadorRepo;
     @Autowired
     private RecursoEspacioRepository recursoEspacioRepo;
+    @Autowired
+    private InscripcionActividadRepository inscripcionRepo;
+    @Autowired
+    private InscripcionExternoRepository externoRepo;
 
 
     @Override
@@ -94,6 +98,22 @@ public class CalendarioServiceImpl implements CalendarioService {
 
         // Organizadores
         dto.setOrganizadores(buscarOrganizadores(idActividad));
+
+        // ===== US-29: indicador de cupo / aforo =====
+        dto.setRequiereInscripcion(Boolean.TRUE.equals(actividad.getRequiereInscripcion()));
+
+        int totalInscritos = inscripcionRepo.countByActividad_IdActividad(idActividad)
+                + externoRepo.countByActividad_IdActividad(idActividad);
+        dto.setTotalInscritos(totalInscritos);
+
+        Integer aforo = (dto.getLugar() != null) ? dto.getLugar().getCapacidad() : null;
+        if (aforo != null && aforo > 0) {
+            dto.setLugaresDisponibles(Math.max(aforo - totalInscritos, 0));
+            dto.setCupoLleno(totalInscritos >= aforo);
+        } else {
+            dto.setLugaresDisponibles(null);
+            dto.setCupoLleno(false);
+        }
 
         return dto;
     }
