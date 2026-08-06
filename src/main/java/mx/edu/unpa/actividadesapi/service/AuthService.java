@@ -20,4 +20,6 @@ public interface AuthService {
 
     // Cambiar contraseña usando el token recibido por correo
     void restablecerContrasena(RestablecerContrasenaRequest request);
+    // logout real con blacklist
+    void logout(String authorizationHeader);
 }

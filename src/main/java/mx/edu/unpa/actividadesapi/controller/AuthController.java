@@ -82,13 +82,14 @@ public class AuthController {
     }
 
     /**
-     * Logout — sin JWT simplemente confirma al frontend.
-     * El frontend limpia el estado de sesión local.
-     * POST /api/auth/logout
+     * US-00: Logout real — agrega el JWT a la blacklist en BD.
+     * El token se invalida del lado del servidor aunque no haya expirado.
      */
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout() {
+    public ResponseEntity<Map<String, String>> logout(
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
         log.info("POST /api/auth/logout");
+        authService.logout(authHeader);
         return ResponseEntity.ok(Map.of("mensaje", "Sesión cerrada."));
     }
 }

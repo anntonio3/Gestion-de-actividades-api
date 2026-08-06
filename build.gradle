@@ -33,7 +33,14 @@ dependencies {
     implementation 'org.springframework.security:spring-security-crypto'
     // JavaMailSender para el envio real de correos.
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    // US-00: Spring Security (filtros, SecurityContext, proteccion de endpoints)
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    // US-00: JJWT — generacion y validacion de tokens JWT
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly  'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly  'io.jsonwebtoken:jjwt-jackson:0.12.6'
 }
+
 
 tasks.named('test') {
     useJUnitPlatform()

@@ -20,4 +20,6 @@ public class LoginResponse {
     private String  iniciales;
     @JsonProperty("tipo")
     private TipoUsuario tipoUsuario;
+
+    private String token;
 }

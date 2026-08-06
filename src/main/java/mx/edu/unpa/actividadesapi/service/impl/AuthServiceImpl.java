@@ -7,21 +7,21 @@ import mx.edu.unpa.actividadesapi.dto.response.RecuperarContrasenaResponse;
 import mx.edu.unpa.actividadesapi.enums.TipoUsuario;
 import mx.edu.unpa.actividadesapi.exception.BusinessException;
 import mx.edu.unpa.actividadesapi.exception.ResourceNotFoundException;
-import mx.edu.unpa.actividadesapi.model.Alumno;
-import mx.edu.unpa.actividadesapi.model.TokenRecuperacion;
-import mx.edu.unpa.actividadesapi.model.Usuario;
-import mx.edu.unpa.actividadesapi.repository.AlumnoRepository;
-import mx.edu.unpa.actividadesapi.repository.TokenRecuperacionRepository;
-import mx.edu.unpa.actividadesapi.repository.UsuarioRepository;
+import mx.edu.unpa.actividadesapi.model.*;
+import mx.edu.unpa.actividadesapi.repository.*;
+import mx.edu.unpa.actividadesapi.security.JwtUtil;
 import mx.edu.unpa.actividadesapi.service.AuthService;
 import mx.edu.unpa.actividadesapi.service.correo.CorreoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,16 +31,19 @@ public class AuthServiceImpl implements AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
 
-    private final UsuarioRepository usuarioRepository;
-    private final AlumnoRepository  alumnoRepository;
+    private final UsuarioRepository          usuarioRepository;
+    private final AlumnoRepository           alumnoRepository;
     private final TokenRecuperacionRepository tokenRepository;
-    private final CorreoService correoService;
+    private final TokenBlacklistRepository   blacklistRepository;
+    private final CorreoService              correoService;
+    private final JwtUtil                    jwtUtil;
 
-    // BCrypt reutilizable — sin Spring Security, instanciamos directamente
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(10);
 
-    // Duración del token de recuperación
     private static final int HORAS_EXPIRACION_TOKEN = 1;
+
+    @Value("${app.url-base:http://localhost:4200}")
+    private String urlBase;
 
     // ====================================================================
     //  Login unificado
@@ -50,64 +53,69 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
         String id = request.getIdentificador().trim();
         log.info("Intento de login para identificador={}", id);
-
-        // Determinar si es matricula (sin @) o correo (con @)
-        boolean esCorreo = id.contains("@");
-
-        if (esCorreo) {
-            return loginConCorreo(id, request.getContrasena());
-        } else {
-            return loginConMatricula(id, request.getContrasena());
-        }
+        return id.contains("@") ? loginConCorreo(id, request.getContrasena())
+                : loginConMatricula(id, request.getContrasena());
     }
 
     private LoginResponse loginConCorreo(String correo, String contrasena) {
-        // Buscar en usuarios (profesor / admin)
         Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(correo.toLowerCase());
         if (usuarioOpt.isPresent()) {
-            Usuario usuario = usuarioOpt.get();
-            if (!Boolean.TRUE.equals(usuario.getActivo())) {
-                log.warn("Login rechazado: usuario inactivo correo={}", correo);
+            Usuario u = usuarioOpt.get();
+            if (!Boolean.TRUE.equals(u.getActivo()))
                 throw new BusinessException("Tu cuenta está desactivada. Contacta al administrador.");
-            }
-            if (!encoder.matches(contrasena, usuario.getContrasenaHash())) {
-                log.warn("Login fallido: contraseña incorrecta correo={}", correo);
+            if (!encoder.matches(contrasena, u.getContrasenaHash()))
                 throw new BusinessException("Correo o contraseña incorrectos.");
-            }
-            log.info("Login exitoso: usuario id={} rol={}", usuario.getIdUsuario(), usuario.getRol());
-            return toLoginResponse(usuario);
+            log.info("Login exitoso: usuario id={} rol={}", u.getIdUsuario(), u.getRol());
+            return toLoginResponse(u);
         }
 
-        // Buscar en alumnos (por si registraron correo institucional)
         Optional<Alumno> alumnoOpt = alumnoRepository.findByCorreo(correo.toLowerCase());
-        if (alumnoOpt.isPresent()) {
-            return validarYResponderAlumno(alumnoOpt.get(), contrasena);
-        }
+        if (alumnoOpt.isPresent()) return validarYResponderAlumno(alumnoOpt.get(), contrasena);
 
-        log.warn("Login fallido: correo no encontrado correo={}", correo);
         throw new BusinessException("Correo o contraseña incorrectos.");
     }
 
     private LoginResponse loginConMatricula(String matricula, String contrasena) {
         Alumno alumno = alumnoRepository.findByMatricula(matricula)
-                .orElseThrow(() -> {
-                    log.warn("Login fallido: matrícula no encontrada matricula={}", matricula);
-                    return new BusinessException("Matrícula o contraseña incorrectos.");
-                });
+                .orElseThrow(() -> new BusinessException("Matrícula o contraseña incorrectos."));
         return validarYResponderAlumno(alumno, contrasena);
     }
 
     private LoginResponse validarYResponderAlumno(Alumno alumno, String contrasena) {
-        if (!Boolean.TRUE.equals(alumno.getActivo())) {
-            log.warn("Login rechazado: alumno inactivo matricula={}", alumno.getMatricula());
+        if (!Boolean.TRUE.equals(alumno.getActivo()))
             throw new BusinessException("Tu cuenta está desactivada. Contacta al administrador.");
-        }
-        if (!encoder.matches(contrasena, alumno.getContrasenaHash())) {
-            log.warn("Login fallido: contraseña incorrecta matricula={}", alumno.getMatricula());
+        if (!encoder.matches(contrasena, alumno.getContrasenaHash()))
             throw new BusinessException("Matrícula o contraseña incorrectos.");
-        }
         log.info("Login exitoso: alumno id={}", alumno.getIdAlumno());
         return toLoginResponse(alumno);
+    }
+
+    // ====================================================================
+    //  Logout — invalida el token en BD
+    // ====================================================================
+    @Override
+    @Transactional
+    public void logout(String tokenHeader) {
+        if (tokenHeader == null || !tokenHeader.startsWith("Bearer ")) return;
+
+        String token = tokenHeader.substring(7);
+        if (!jwtUtil.esValido(token)) return;
+
+        // Evitar duplicados
+        if (blacklistRepository.existsByToken(token)) return;
+
+        // Obtener fecha de expiración del token para limpieza futura
+        Date exp = jwtUtil.parsear(token).getExpiration();
+        LocalDateTime fechaExp = exp.toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDateTime();
+
+        TokenBlacklist entrada = new TokenBlacklist();
+        entrada.setToken(token);
+        entrada.setFechaExpiracion(fechaExp);
+        blacklistRepository.save(entrada);
+
+        log.info("Token agregado a blacklist — expira {}", fechaExp);
     }
 
     // ====================================================================
@@ -118,25 +126,16 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse registrarAlumno(RegistroAlumnoRequest request) {
         log.info("Registro de alumno matricula={}", request.getMatricula());
 
-        // Validar que las contraseñas coincidan
-        if (!request.getContrasena().equals(request.getConfirmarContrasena())) {
+        if (!request.getContrasena().equals(request.getConfirmarContrasena()))
             throw new BusinessException("Las contraseñas no coinciden.");
-        }
 
         String matricula = request.getMatricula().trim();
         String correo    = request.getCorreo().trim().toLowerCase();
 
-        // Validar unicidad de matrícula
-        if (alumnoRepository.existsByMatricula(matricula)) {
-            log.warn("Registro rechazado: matrícula duplicada matricula={}", matricula);
+        if (alumnoRepository.existsByMatricula(matricula))
             throw new BusinessException("Ya existe una cuenta con esa matrícula.");
-        }
-
-        // Validar unicidad de correo (en alumnos y en usuarios)
-        if (alumnoRepository.existsByCorreo(correo) || usuarioRepository.existsByCorreo(correo)) {
-            log.warn("Registro rechazado: correo duplicado correo={}", correo);
+        if (alumnoRepository.existsByCorreo(correo) || usuarioRepository.existsByCorreo(correo))
             throw new BusinessException("Ya existe una cuenta con ese correo.");
-        }
 
         Alumno alumno = new Alumno();
         alumno.setMatricula(matricula);
@@ -147,8 +146,7 @@ public class AuthServiceImpl implements AuthService {
         alumno.setActivo(true);
 
         Alumno guardado = alumnoRepository.save(alumno);
-        log.info("Alumno registrado id={} matricula={}", guardado.getIdAlumno(), guardado.getMatricula());
-
+        log.info("Alumno registrado id={}", guardado.getIdAlumno());
         return toLoginResponse(guardado);
     }
 
@@ -159,79 +157,56 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public RecuperarContrasenaResponse solicitarRecuperacion(RecuperarContrasenaRequest request) {
         String correo = request.getCorreo().trim().toLowerCase();
-        log.info("Solicitud de recuperación de contraseña para correo={}", correo);
 
-        // Buscar en usuarios (profesor/admin)
         Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreo(correo);
         if (usuarioOpt.isPresent()) {
-            Usuario usuario = usuarioOpt.get();
-            tokenRepository.invalidarTokensDeUsuario(usuario.getIdUsuario());
-            String tokenStr = generarYGuardarTokenUsuario(usuario);
-            String url = construirUrlRecuperacion(tokenStr);
-            return correoService.enviarRecuperacion(correo, url, tokenStr);
+            Usuario u = usuarioOpt.get();
+            tokenRepository.invalidarTokensDeUsuario(u.getIdUsuario());
+            String tokenStr = generarYGuardarTokenUsuario(u);
+            return correoService.enviarRecuperacion(correo, urlBase + "/auth/restablecer/" + tokenStr, tokenStr);
         }
 
-        // Buscar en alumnos
         Optional<Alumno> alumnoOpt = alumnoRepository.findByCorreo(correo);
         if (alumnoOpt.isPresent()) {
-            Alumno alumno = alumnoOpt.get();
-            tokenRepository.invalidarTokensDeAlumno(alumno.getIdAlumno());
-            String tokenStr = generarYGuardarTokenAlumno(alumno);
-            String url = construirUrlRecuperacion(tokenStr);
-            return correoService.enviarRecuperacion(correo, url, tokenStr);
+            Alumno a = alumnoOpt.get();
+            tokenRepository.invalidarTokensDeAlumno(a.getIdAlumno());
+            String tokenStr = generarYGuardarTokenAlumno(a);
+            return correoService.enviarRecuperacion(correo, urlBase + "/auth/restablecer/" + tokenStr, tokenStr);
         }
 
-        // Respuesta genérica: no revelamos si el correo existe o no (seguridad)
-        log.warn("Recuperación solicitada para correo no registrado={}", correo);
-        RecuperarContrasenaResponse respuesta = new RecuperarContrasenaResponse();
-        respuesta.setMensaje("Si el correo está registrado, recibirás un enlace en breve.");
-        return respuesta;
+        RecuperarContrasenaResponse r = new RecuperarContrasenaResponse();
+        r.setMensaje("Si el correo está registrado, recibirás un enlace en breve.");
+        return r;
     }
 
     @Override
     @Transactional(readOnly = true)
     public void verificarToken(String token) {
         TokenRecuperacion tr = tokenRepository.findByToken(token)
-                .orElseThrow(() -> {
-                    log.warn("Verificación de token inválido token={}", token);
-                    return new BusinessException("El enlace de recuperación no es válido o ya fue utilizado.");
-                });
-
-        if (!tr.esValido()) {
-            log.warn("Token expirado o ya usado token={}", token);
+                .orElseThrow(() -> new BusinessException("El enlace de recuperación no es válido o ya fue utilizado."));
+        if (!tr.esValido())
             throw new BusinessException("El enlace de recuperación expiró o ya fue utilizado.");
-        }
     }
 
     @Override
     @Transactional
     public void restablecerContrasena(RestablecerContrasenaRequest request) {
-        log.info("Intento de restablecimiento de contraseña");
-
-        if (!request.getNuevaContrasena().equals(request.getConfirmarContrasena())) {
+        if (!request.getNuevaContrasena().equals(request.getConfirmarContrasena()))
             throw new BusinessException("Las contraseñas no coinciden.");
-        }
 
         TokenRecuperacion tr = tokenRepository.findByToken(request.getToken())
                 .orElseThrow(() -> new BusinessException("El enlace de recuperación no es válido."));
-
-        if (!tr.esValido()) {
+        if (!tr.esValido())
             throw new BusinessException("El enlace de recuperación expiró o ya fue utilizado.");
-        }
 
         String nuevoHash = encoder.encode(request.getNuevaContrasena());
-
         if (tr.getUsuario() != null) {
             tr.getUsuario().setContrasenaHash(nuevoHash);
             usuarioRepository.save(tr.getUsuario());
-            log.info("Contraseña restablecida para usuario id={}", tr.getUsuario().getIdUsuario());
         } else if (tr.getAlumno() != null) {
             tr.getAlumno().setContrasenaHash(nuevoHash);
             alumnoRepository.save(tr.getAlumno());
-            log.info("Contraseña restablecida para alumno id={}", tr.getAlumno().getIdAlumno());
         }
-
-        // Marcar como usado para que no se pueda reutilizar
         tr.setUsado(true);
         tokenRepository.save(tr);
     }
@@ -240,27 +215,22 @@ public class AuthServiceImpl implements AuthService {
     //  Helpers privados
     // ====================================================================
 
-    private String generarYGuardarTokenUsuario(Usuario usuario) {
+    private String generarYGuardarTokenUsuario(Usuario u) {
         TokenRecuperacion tr = new TokenRecuperacion();
         tr.setToken(UUID.randomUUID().toString());
-        tr.setUsuario(usuario);
+        tr.setUsuario(u);
         tr.setFechaExpiracion(LocalDateTime.now().plusHours(HORAS_EXPIRACION_TOKEN));
         tokenRepository.save(tr);
         return tr.getToken();
     }
 
-    private String generarYGuardarTokenAlumno(Alumno alumno) {
+    private String generarYGuardarTokenAlumno(Alumno a) {
         TokenRecuperacion tr = new TokenRecuperacion();
         tr.setToken(UUID.randomUUID().toString());
-        tr.setAlumno(alumno);
+        tr.setAlumno(a);
         tr.setFechaExpiracion(LocalDateTime.now().plusHours(HORAS_EXPIRACION_TOKEN));
         tokenRepository.save(tr);
         return tr.getToken();
-    }
-
-    private String construirUrlRecuperacion(String token) {
-        // En producción esta URL viene de application.properties
-        return "http://localhost:4200/auth/restablecer/" + token;
     }
 
     private LoginResponse toLoginResponse(Usuario u) {
@@ -271,8 +241,9 @@ public class AuthServiceImpl implements AuthService {
         dto.setCorreo(u.getCorreo());
         dto.setMatricula(null);
         dto.setIniciales(calcularIniciales(u.getNombre(), u.getApellidos()));
-        // Convertimos el enum Rol a TipoUsuario
-        dto.setTipoUsuario(TipoUsuario.valueOf(u.getRol().name()));
+        TipoUsuario tipo = TipoUsuario.valueOf(u.getRol().name());
+        dto.setTipoUsuario(tipo);
+        dto.setToken(jwtUtil.generar(u.getIdUsuario(), u.getNombre(), tipo));
         return dto;
     }
 
@@ -285,6 +256,7 @@ public class AuthServiceImpl implements AuthService {
         dto.setMatricula(a.getMatricula());
         dto.setIniciales(calcularIniciales(a.getNombre(), a.getApellidos()));
         dto.setTipoUsuario(TipoUsuario.ALUMNO);
+        dto.setToken(jwtUtil.generar(a.getIdAlumno(), a.getNombre(), TipoUsuario.ALUMNO));
         return dto;
     }
 
