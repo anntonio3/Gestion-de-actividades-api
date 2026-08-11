@@ -23,6 +23,7 @@ public class SolicitudResponseDTO {
     private String motivoRechazo;
     private LocalDateTime fechaRegistro;
     private LocalDateTime fechaActualizacion;
+    private Boolean requiereInscripcion;
 
     // Campos adicionales para que el profesor vea todo lo que registró
     private String tipoActividad;

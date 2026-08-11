@@ -26,6 +26,9 @@ public interface InscripcionActividadRepository
     // Contar inscritos en una actividad
     int countByActividad_IdActividad(Integer idActividad);
 
+    // Listar todas las inscripciones de una actividad
+    List<InscripcionActividad> findByActividad_IdActividad(Integer idActividad);
+
     // Listar inscripciones de un usuario institucional
     List<InscripcionActividad> findByUsuario_IdUsuarioOrderByFechaInscripcionDesc(Integer idUsuario);
 

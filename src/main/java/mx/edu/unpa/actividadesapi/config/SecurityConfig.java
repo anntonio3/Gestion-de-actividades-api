@@ -123,6 +123,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/actividades/**").hasAnyRole("PROFESOR", "ADMIN")
                         .requestMatchers("/api/actividades/mis-solicitudes").hasAnyRole("PROFESOR", "ADMIN")
                         .requestMatchers("/api/actividades/*/recordatorio").hasAnyRole("PROFESOR", "ADMIN")
+                        .requestMatchers("/api/actividades/*/inscritos/**").hasAnyRole("PROFESOR", "ADMIN")
                         .requestMatchers("/api/avisos/**").hasAnyRole("PROFESOR", "ADMIN")
                         .requestMatchers("/api/asistencia/**").hasAnyRole("PROFESOR", "ADMIN")
 

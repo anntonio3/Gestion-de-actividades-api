@@ -208,6 +208,7 @@ public class SolicitudesServiceImpl implements SolicitudesService {
                 a.getMotivoRechazo(),
                 a.getFechaRegistro(),
                 a.getFechaActualizacion(),
+                a.getRequiereInscripcion(),   // US-31
                 a.getTipo().getNombre(),
                 a.getTipo().getCategoria() != null ? a.getTipo().getCategoria().getNombre() : null,
                 organizadores,

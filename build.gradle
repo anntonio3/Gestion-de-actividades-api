@@ -39,6 +39,8 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly  'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly  'io.jsonwebtoken:jjwt-jackson:0.12.6'
+    // US-pdf: iText 7 — generacion de PDF de lista de inscritos
+    implementation 'com.itextpdf:itext7-core:7.2.5'
 }
 
 

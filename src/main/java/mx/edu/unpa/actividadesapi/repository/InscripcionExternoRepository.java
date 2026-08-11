@@ -3,6 +3,7 @@ package mx.edu.unpa.actividadesapi.repository;
 import mx.edu.unpa.actividadesapi.model.InscripcionExterno;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import java.util.List;
 
 import java.util.Optional;
 
@@ -12,6 +13,8 @@ import java.util.Optional;
 @Repository
 public interface InscripcionExternoRepository
         extends JpaRepository<InscripcionExterno, Integer> {
+
+    List<InscripcionExterno> findByActividad_IdActividad(Integer idActividad);
 
     // Total de externos inscritos en una actividad
     int countByActividad_IdActividad(Integer idActividad);
