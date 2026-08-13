@@ -31,6 +31,10 @@ public class SolicitudResponseDTO {
     private List<RecursoResumenDTO> recursos;
     private List<ImagenDTO> imagenes;
 
+    // NUEVO (US-28): indica si el evento requiere inscripcion formal,
+    // usado por el frontend para mostrar el boton "Ver inscritos"
+    private Boolean requiereInscripcion;
+
     @Data
     @AllArgsConstructor
     public static class RecursoResumenDTO {

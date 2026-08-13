@@ -33,6 +33,7 @@ dependencies {
     implementation 'org.springframework.security:spring-security-crypto'
     // JavaMailSender para el envio real de correos.
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'com.github.librepdf:openpdf:1.3.30'
 }
 
 tasks.named('test') {
