@@ -34,4 +34,16 @@ public class CorreoServiceSimuladoImpl implements CorreoService {
         respuesta.setTokenSimulado(token); // visible en la respuesta JSON para pruebas
         return respuesta;
     }
+
+    @Override
+    public void enviarRecordatorio(String destinatario, String nombreEvento,
+                                   String fecha, String hora, String lugar, String urlEvento) {
+        log.info("==========================================================");
+        log.info("[RECORDATORIO SIMULADO] Para    : {}", destinatario);
+        log.info("[RECORDATORIO SIMULADO] Evento  : {}", nombreEvento);
+        log.info("[RECORDATORIO SIMULADO] Fecha   : {} | Hora: {}", fecha, hora);
+        log.info("[RECORDATORIO SIMULADO] Lugar   : {}", lugar != null ? lugar : "Sin espacio asignado");
+        log.info("[RECORDATORIO SIMULADO] Enlace  : {}", urlEvento);
+        log.info("==========================================================");
+    }
 }

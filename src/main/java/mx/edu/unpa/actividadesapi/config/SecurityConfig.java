@@ -1,5 +1,6 @@
 package mx.edu.unpa.actividadesapi.config;
 
+import jakarta.servlet.DispatcherType;
 import mx.edu.unpa.actividadesapi.security.JwtFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -74,6 +75,9 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
+
+                        // US-07: permitir dispatch asíncrono del SSE sin re-validar seguridad
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
 
                         // ── Públicos sin token ────────────────────────────────
                         .requestMatchers("/api/auth/**").permitAll()

@@ -19,4 +19,21 @@ public interface CorreoService {
      * @param token        token en texto plano (solo para simulación)
      */
     RecuperarContrasenaResponse enviarRecuperacion(String destinatario, String url, String token);
+
+    /**
+     * US-07: Envía (o simula) un correo de recordatorio de evento.
+     *
+     * @param destinatario correo del inscrito
+     * @param nombreEvento nombre de la actividad
+     * @param fecha        fecha formateada, ej. "lunes 9 de noviembre de 2026"
+     * @param hora         rango horario, ej. "09:00 – 17:00"
+     * @param lugar        nombre del lugar (null si no hay espacio asignado)
+     * @param urlEvento    enlace público al detalle del evento
+     */
+    void enviarRecordatorio(String destinatario,
+                            String nombreEvento,
+                            String fecha,
+                            String hora,
+                            String lugar,
+                            String urlEvento);
 }

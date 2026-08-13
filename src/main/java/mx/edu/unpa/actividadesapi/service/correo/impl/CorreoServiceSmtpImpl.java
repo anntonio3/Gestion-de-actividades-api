@@ -44,7 +44,7 @@ public class CorreoServiceSmtpImpl implements CorreoService {
             mensaje.setFrom(remitente);
             mensaje.setTo(destinatario);
             mensaje.setSubject("Recuperación de contraseña — UNPA Eventos");
-            mensaje.setText(construirCuerpo(url));
+            mensaje.setText(construirCuerpoRecuperacion(url));
 
             mailSender.send(mensaje);
             log.info("Correo de recuperación enviado a {}", destinatario);
@@ -60,7 +60,23 @@ public class CorreoServiceSmtpImpl implements CorreoService {
         return respuesta;
     }
 
-    private String construirCuerpo(String url) {
+    @Override
+    public void enviarRecordatorio(String destinatario, String nombreEvento,
+                                   String fecha, String hora, String lugar, String urlEvento) {
+        try {
+            SimpleMailMessage mensaje = new SimpleMailMessage();
+            mensaje.setFrom(remitente);
+            mensaje.setTo(destinatario);
+            mensaje.setSubject("Recordatorio: " + nombreEvento + " — UNPA Eventos");
+            mensaje.setText(construirCuerpoRecordatorio(nombreEvento, fecha, hora, lugar, urlEvento));
+            mailSender.send(mensaje);
+            log.info("[RECORDATORIO] Enviado a {}", destinatario);
+        } catch (Exception e) {
+            log.error("[RECORDATORIO] Error al enviar a {}: {}", destinatario, e.getMessage());
+        }
+    }
+
+    private String construirCuerpoRecuperacion(String url) {
         return """
                 Hola,
 
@@ -73,5 +89,29 @@ public class CorreoServiceSmtpImpl implements CorreoService {
 
                 UNPA — Gestión de Eventos Universitarios
                 """.formatted(url);
+    }
+    private String construirCuerpoRecordatorio(String nombreEvento, String fecha,
+                                               String hora, String lugar, String urlEvento) {
+        String lugarTexto = (lugar != null && !lugar.isBlank())
+                ? "Lugar  : " + lugar
+                : "Lugar  : Por confirmar";
+
+        return """
+                Hola,
+ 
+                Te recordamos que tienes una inscripción confirmada en el siguiente evento:
+ 
+                Evento : %s
+                Fecha  : %s
+                Hora   : %s
+                %s
+ 
+                Puedes consultar los detalles completos aquí:
+                %s
+ 
+                ¡Te esperamos!
+ 
+                UNPA — Gestión de Eventos Universitarios
+                """.formatted(nombreEvento, fecha, hora, lugarTexto, urlEvento);
     }
 }
