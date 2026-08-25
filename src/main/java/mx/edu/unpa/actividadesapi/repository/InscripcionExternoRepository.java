@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -30,4 +31,7 @@ public interface InscripcionExternoRepository
     // Busca la inscripcion de un visitante en una actividad (para cancelar)
     Optional<InscripcionExterno> findByActividad_IdActividadAndVisitante_IdVisitante(
             Integer idActividad, String idVisitante);
+
+    // Listar inscritos externos de una actividad, ordenados por fecha (US-28)
+    List<InscripcionExterno> findByActividad_IdActividadOrderByFechaInscripcionAsc(Integer idActividad);
 }

@@ -35,6 +35,9 @@ public interface InscripcionActividadRepository
     // Listar inscripciones de un alumno
     List<InscripcionActividad> findByAlumno_IdAlumnoOrderByFechaInscripcionDesc(Integer idAlumno);
 
+    // Listar inscripciones de una actividad, ordenadas por fecha (US-28)
+    List<InscripcionActividad> findByActividad_IdActividadOrderByFechaInscripcionAsc(Integer idActividad);
+
     /**
      * Detecta conflicto de horario para un usuario institucional.
      * Devuelve inscripciones en actividades aprobadas que se solapan

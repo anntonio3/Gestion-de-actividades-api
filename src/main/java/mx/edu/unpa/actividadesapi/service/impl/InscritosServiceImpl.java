@@ -1,262 +1,309 @@
 package mx.edu.unpa.actividadesapi.service.impl;
 
-import com.itextpdf.io.font.constants.StandardFonts;
-import com.itextpdf.kernel.colors.ColorConstants;
-import com.itextpdf.kernel.font.PdfFont;
-import com.itextpdf.kernel.font.PdfFontFactory;
-import com.itextpdf.kernel.geom.PageSize;
-import com.itextpdf.kernel.pdf.PdfDocument;
-import com.itextpdf.kernel.pdf.PdfWriter;
-import com.itextpdf.layout.Document;
-import com.itextpdf.layout.element.*;
-import com.itextpdf.layout.properties.TextAlignment;
-import com.itextpdf.layout.properties.UnitValue;
-import lombok.RequiredArgsConstructor;
-import mx.edu.unpa.actividadesapi.dto.response.InscritoListaItemResponse;
-import mx.edu.unpa.actividadesapi.enums.Rol;
+import com.lowagie.text.*;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
+import mx.edu.unpa.actividadesapi.dto.response.InscritoDTO;
+import mx.edu.unpa.actividadesapi.dto.response.ListaInscritosResponseDTO;
+import mx.edu.unpa.actividadesapi.enums.TipoParticipante;
 import mx.edu.unpa.actividadesapi.exception.BusinessException;
 import mx.edu.unpa.actividadesapi.exception.ResourceNotFoundException;
 import mx.edu.unpa.actividadesapi.model.Actividad;
-import mx.edu.unpa.actividadesapi.repository.*;
+import mx.edu.unpa.actividadesapi.model.InscripcionActividad;
+import mx.edu.unpa.actividadesapi.model.InscripcionExterno;
+import mx.edu.unpa.actividadesapi.repository.ActividadRepository;
+import mx.edu.unpa.actividadesapi.repository.InscripcionActividadRepository;
+import mx.edu.unpa.actividadesapi.repository.InscripcionExternoRepository;
 import mx.edu.unpa.actividadesapi.service.InscritosService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
+/**
+ * Servicio de consulta de inscritos (US-28).
+ * Unifica inscripciones internas (alumno/docente) y externas (US-24)
+ * en una sola lista, y genera PDF/CSV descargables.
+ *
+ * Fusion de dos implementaciones (Vianey/Bere): se conserva la
+ * validacion de requiereInscripcion y el esquema de autorizacion
+ * basado en el JWT (esAdmin ya viene resuelto desde el controller),
+ * y se incorporan del otro desarrollador el identificador de contacto,
+ * la numeracion de fila y el diseño de tabla con colores alternos.
+ */
 @Service
-@RequiredArgsConstructor
 public class InscritosServiceImpl implements InscritosService {
 
-    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final Logger log = LoggerFactory.getLogger(InscritosServiceImpl.class);
+    private static final DateTimeFormatter FMT_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter FMT_FECHA_LARGA =
+            DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new Locale("es"));
 
-    private final ActividadRepository            actividadRepository;
-    private final InscripcionActividadRepository inscripcionRepository;
-    private final InscripcionExternoRepository   externoRepository;
-    private final UsuarioRepository              usuarioRepository;
+    @Autowired
+    private ActividadRepository actividadRepository;
 
-    // ── Lista ─────────────────────────────────────────────────────────────────
+    @Autowired
+    private InscripcionActividadRepository inscripcionRepository;
 
+    @Autowired
+    private InscripcionExternoRepository externoRepository;
+
+    // ====================================================================
+    // Lista unificada
+    // ====================================================================
     @Override
     @Transactional(readOnly = true)
-    public List<InscritoListaItemResponse> obtenerLista(Integer idActividad, Integer idSolicitante) {
-        Actividad actividad = validarAcceso(idActividad, idSolicitante);
-        return construirLista(actividad);
+    public ListaInscritosResponseDTO obtenerLista(Integer idActividad, Integer idSolicitante, boolean esAdmin) {
+        log.info("Consultando lista de inscritos actividad={} solicitante={} esAdmin={}",
+                idActividad, idSolicitante, esAdmin);
+
+        Actividad actividad = obtenerActividadValidada(idActividad, idSolicitante, esAdmin);
+        List<InscritoDTO> inscritos = construirLista(actividad);
+
+        log.info("Lista de inscritos generada: actividad={} total={}", idActividad, inscritos.size());
+
+        return new ListaInscritosResponseDTO(
+                actividad.getIdActividad(),
+                actividad.getNombre(),
+                actividad.getFechaActividad(),
+                actividad.getHoraInicio(),
+                actividad.getHoraFin(),
+                inscritos.size(),
+                inscritos
+        );
     }
 
-    // ── PDF ───────────────────────────────────────────────────────────────────
-
+    // ====================================================================
+    // PDF
+    // ====================================================================
     @Override
     @Transactional(readOnly = true)
-    public byte[] generarPdf(Integer idActividad, Integer idSolicitante) {
-        Actividad actividad = validarAcceso(idActividad, idSolicitante);
-        List<InscritoListaItemResponse> lista = construirLista(actividad);
+    public byte[] generarPdf(Integer idActividad, Integer idSolicitante, boolean esAdmin) {
+        ListaInscritosResponseDTO lista = obtenerLista(idActividad, idSolicitante, esAdmin);
 
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            PdfWriter   writer   = new PdfWriter(baos);
-            PdfDocument pdfDoc   = new PdfDocument(writer);
-            Document    document = new Document(pdfDoc, PageSize.A4);
-            document.setMargins(40, 40, 40, 40);
+        try {
+            ByteArrayOutputStream salida = new ByteArrayOutputStream();
+            Document documento = new Document(PageSize.LETTER, 40, 40, 60, 40);
+            PdfWriter.getInstance(documento, salida);
+            documento.open();
 
-            PdfFont bold    = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
-            PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+            // ── Membrete con logo ────────────────────────────────────────────
+            Font fuenteTitulo = new Font(Font.HELVETICA, 16, Font.BOLD);
+            Font fuenteSub = new Font(Font.HELVETICA, 10, Font.NORMAL, java.awt.Color.GRAY);
 
-            // ── Membrete ──────────────────────────────────────────────────────
-            document.add(new Paragraph("UNPA — Universidad del Papaloapan")
-                    .setFont(bold).setFontSize(13)
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setMarginBottom(2));
+            try {
+                ClassPathResource logoResource = new ClassPathResource("assets/he-logo-unpa.png");
+                try (InputStream is = logoResource.getInputStream()) {
+                    Image logo = Image.getInstance(is.readAllBytes());
+                    logo.scaleToFit(140, 60);
+                    logo.setAlignment(Element.ALIGN_CENTER);
+                    documento.add(logo);
+                }
+            } catch (Exception ex) {
+                log.warn("No se pudo cargar el logo del membrete, se omite: {}", ex.getMessage());
+            }
 
-            document.add(new Paragraph("Gestión de Eventos Universitarios")
-                    .setFont(regular).setFontSize(10)
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontColor(ColorConstants.GRAY)
-                    .setMarginBottom(14));
+            Paragraph membrete = new Paragraph("Universidad del Papaloapan", fuenteTitulo);
+            membrete.setAlignment(Element.ALIGN_CENTER);
+            documento.add(membrete);
 
-            // ── Título del evento ─────────────────────────────────────────────
-            document.add(new Paragraph("Lista de inscritos")
-                    .setFont(bold).setFontSize(11)
-                    .setFontColor(ColorConstants.GRAY)
-                    .setMarginBottom(2));
+            Paragraph subtitulo = new Paragraph("Gestion de Eventos Universitarios - Lista de Inscritos", fuenteSub);
+            subtitulo.setAlignment(Element.ALIGN_CENTER);
+            subtitulo.setSpacingAfter(16);
+            documento.add(subtitulo);
 
-            document.add(new Paragraph(actividad.getNombre())
-                    .setFont(bold).setFontSize(15)
-                    .setMarginBottom(4));
+            // ── Datos del evento ──────────────────────────────────────────────
+            Font fuenteEventoLabel = new Font(Font.HELVETICA, 10, Font.BOLD, java.awt.Color.GRAY);
+            Font fuenteEventoNombre = new Font(Font.HELVETICA, 15, Font.BOLD);
+            Font fuenteEventoDatos = new Font(Font.HELVETICA, 10, Font.NORMAL, java.awt.Color.GRAY);
 
-            String fecha = actividad.getFechaActividad()
-                    .format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
-                            new java.util.Locale("es")));
-            document.add(new Paragraph("Fecha: " + fecha
-                    + "   |   Hora: " + actividad.getHoraInicio()
-                    + " – " + actividad.getHoraFin())
-                    .setFont(regular).setFontSize(10)
-                    .setFontColor(ColorConstants.GRAY)
-                    .setMarginBottom(14));
+            documento.add(new Paragraph("EVENTO", fuenteEventoLabel));
+            documento.add(new Paragraph(lista.getNombreEvento(), fuenteEventoNombre));
+
+            String fechaLarga = lista.getFechaEvento().format(FMT_FECHA_LARGA);
+            Paragraph datosEvento = new Paragraph(
+                    "Fecha: " + fechaLarga + "   |   Hora: " + lista.getHoraInicio() + " - " + lista.getHoraFin(),
+                    fuenteEventoDatos);
+            datosEvento.setSpacingAfter(14);
+            documento.add(datosEvento);
 
             // ── Tabla ─────────────────────────────────────────────────────────
-            float[] anchos = {1f, 3f, 2f, 2.5f, 2f};
-            Table tabla = new Table(UnitValue.createPercentArray(anchos))
-                    .useAllAvailableWidth();
+            PdfPTable tabla = new PdfPTable(5);
+            tabla.setWidthPercentage(100);
+            tabla.setWidths(new float[]{0.6f, 3f, 1.6f, 2.2f, 1.8f});
 
-            // Encabezados
+            Font fuenteHeader = new Font(Font.HELVETICA, 9, Font.BOLD, java.awt.Color.WHITE);
             for (String header : new String[]{"#", "Nombre", "Tipo", "Identificador", "Inscrito el"}) {
-                tabla.addHeaderCell(new Cell()
-                        .add(new Paragraph(header).setFont(bold).setFontSize(9))
-                        .setBackgroundColor(new com.itextpdf.kernel.colors.DeviceRgb(46, 125, 82))
-                        .setFontColor(ColorConstants.WHITE)
-                        .setPadding(5));
+                agregarCeldaHeader(tabla, header, fuenteHeader);
             }
 
-            // Filas
-            boolean alt = false;
-            for (InscritoListaItemResponse item : lista) {
-                com.itextpdf.kernel.colors.Color fondo = alt
-                        ? new com.itextpdf.kernel.colors.DeviceRgb(240, 248, 244)
-                        : ColorConstants.WHITE;
+            Font fuenteCelda = new Font(Font.HELVETICA, 9, Font.NORMAL);
+            java.awt.Color colorAlterno = new java.awt.Color(240, 248, 244);
+            boolean alterna = false;
 
-                tabla.addCell(celdaTabla(String.valueOf(item.getNumero()), regular, fondo));
-                tabla.addCell(celdaTabla(item.getNombre(),          regular, fondo));
-                tabla.addCell(celdaTabla(item.getTipoParticipante(),regular, fondo));
-                tabla.addCell(celdaTabla(item.getIdentificador(),   regular, fondo));
-                tabla.addCell(celdaTabla(item.getFechaInscripcion(),regular, fondo));
-                alt = !alt;
+            for (InscritoDTO i : lista.getInscritos()) {
+                java.awt.Color fondo = alterna ? colorAlterno : java.awt.Color.WHITE;
+                tabla.addCell(celda(String.valueOf(i.getNumero()), fuenteCelda, fondo));
+                tabla.addCell(celda(i.getNombre(), fuenteCelda, fondo));
+                tabla.addCell(celda(etiquetaTipo(i.getTipoParticipante()), fuenteCelda, fondo));
+                tabla.addCell(celda(i.getIdentificador() != null ? i.getIdentificador() : "—", fuenteCelda, fondo));
+                tabla.addCell(celda(i.getFechaInscripcion().format(FMT_FECHA), fuenteCelda, fondo));
+                alterna = !alterna;
             }
 
-            if (lista.isEmpty()) {
-                tabla.addCell(new Cell(1, 5)
-                        .add(new Paragraph("Sin inscritos aún.")
-                                .setFont(regular).setFontSize(9)
-                                .setTextAlignment(TextAlignment.CENTER))
-                        .setPadding(8));
+            if (lista.getInscritos().isEmpty()) {
+                PdfPCell vacia = new PdfPCell(new Phrase("Sin inscritos aún.", fuenteCelda));
+                vacia.setColspan(5);
+                vacia.setHorizontalAlignment(Element.ALIGN_CENTER);
+                vacia.setPadding(8);
+                tabla.addCell(vacia);
             }
 
-            document.add(tabla);
+            documento.add(tabla);
 
             // ── Pie ───────────────────────────────────────────────────────────
-            document.add(new Paragraph("\nTotal de inscritos: " + lista.size())
-                    .setFont(bold).setFontSize(10)
-                    .setMarginTop(10));
+            Font fuenteTotal = new Font(Font.HELVETICA, 10, Font.BOLD);
+            Font fuenteGenerado = new Font(Font.HELVETICA, 8, Font.NORMAL, java.awt.Color.GRAY);
 
-            document.add(new Paragraph("Generado el "
-                    + java.time.LocalDateTime.now().format(
-                    DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
-                    .setFont(regular).setFontSize(8)
-                    .setFontColor(ColorConstants.GRAY));
+            Paragraph total = new Paragraph("\nTotal de inscritos: " + lista.getTotalInscritos(), fuenteTotal);
+            total.setSpacingBefore(10);
+            documento.add(total);
 
-            document.close();
-            return baos.toByteArray();
+            String generadoEl = java.time.LocalDateTime.now().format(FMT_FECHA);
+            documento.add(new Paragraph("Generado el " + generadoEl, fuenteGenerado));
 
-        } catch (IOException e) {
-            throw new BusinessException("Error al generar el PDF: " + e.getMessage());
+            documento.close();
+            log.info("PDF de inscritos generado para actividad={}", idActividad);
+            return salida.toByteArray();
+
+        } catch (DocumentException ex) {
+            log.error("Error al generar PDF de inscritos actividad={}: {}", idActividad, ex.getMessage());
+            throw new BusinessException("No fue posible generar el PDF de inscritos.");
         }
     }
 
-    // ── CSV ───────────────────────────────────────────────────────────────────
+    private void agregarCeldaHeader(PdfPTable tabla, String texto, Font fuente) {
+        PdfPCell celda = new PdfPCell(new Phrase(texto, fuente));
+        celda.setBackgroundColor(new java.awt.Color(113, 182, 167));
+        celda.setPadding(6);
+        celda.setHorizontalAlignment(Element.ALIGN_CENTER);
+        tabla.addCell(celda);
+    }
 
+    private PdfPCell celda(String texto, Font fuente, java.awt.Color fondo) {
+        PdfPCell celda = new PdfPCell(new Phrase(texto != null ? texto : "—", fuente));
+        celda.setBackgroundColor(fondo);
+        celda.setPadding(5);
+        return celda;
+    }
+
+    // ====================================================================
+    // CSV
+    // ====================================================================
     @Override
     @Transactional(readOnly = true)
-    public byte[] generarCsv(Integer idActividad, Integer idSolicitante) {
-        Actividad actividad = validarAcceso(idActividad, idSolicitante);
-        List<InscritoListaItemResponse> lista = construirLista(actividad);
+    public byte[] generarCsv(Integer idActividad, Integer idSolicitante, boolean esAdmin) {
+        ListaInscritosResponseDTO lista = obtenerLista(idActividad, idSolicitante, esAdmin);
 
         StringBuilder sb = new StringBuilder();
-        // BOM UTF-8 para que Excel lo abra correctamente
-        sb.append('\uFEFF');
-        sb.append("Evento:,").append(escapeCsv(actividad.getNombre())).append("\n");
-        sb.append("Fecha:,").append(actividad.getFechaActividad()).append("\n");
-        sb.append("Total inscritos:,").append(lista.size()).append("\n\n");
+        sb.append('\uFEFF'); // BOM para que Excel respete acentos
+        sb.append("Universidad del Papaloapan - Lista de Inscritos\n");
+        sb.append("Evento:,").append(escaparCsv(lista.getNombreEvento())).append('\n');
+        sb.append("Fecha:,").append(lista.getFechaEvento().format(FMT_FECHA_LARGA)).append('\n');
+        sb.append("Horario:,").append(lista.getHoraInicio()).append(" - ").append(lista.getHoraFin()).append('\n');
+        sb.append("Total inscritos:,").append(lista.getTotalInscritos()).append("\n\n");
+        sb.append("#,Nombre,Tipo,Identificador,Fecha de inscripcion\n");
 
-        sb.append("#,Nombre,Tipo,Identificador,Fecha inscripción\n");
-        for (InscritoListaItemResponse item : lista) {
-            sb.append(item.getNumero()).append(",")
-                    .append(escapeCsv(item.getNombre())).append(",")
-                    .append(escapeCsv(item.getTipoParticipante())).append(",")
-                    .append(escapeCsv(item.getIdentificador())).append(",")
-                    .append(escapeCsv(item.getFechaInscripcion())).append("\n");
+        for (InscritoDTO i : lista.getInscritos()) {
+            sb.append(i.getNumero()).append(',')
+                    .append(escaparCsv(i.getNombre())).append(',')
+                    .append(escaparCsv(etiquetaTipo(i.getTipoParticipante()))).append(',')
+                    .append(escaparCsv(i.getIdentificador() != null ? i.getIdentificador() : "—")).append(',')
+                    .append(i.getFechaInscripcion().format(FMT_FECHA)).append('\n');
         }
 
+        log.info("CSV de inscritos generado para actividad={}", idActividad);
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /**
-     * Valida que el solicitante tenga permiso de ver la lista:
-     * - Es el profesor propietario del evento, O
-     * - Es ADMIN
-     */
-    private Actividad validarAcceso(Integer idActividad, Integer idSolicitante) {
-        Actividad actividad = actividadRepository.findById(idActividad)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Actividad no encontrada: " + idActividad));
-
-        boolean esProfesorDueno = actividad.getProfesor().getIdUsuario().equals(idSolicitante);
-        boolean esAdmin = usuarioRepository.findById(idSolicitante)
-                .map(u -> u.getRol() == Rol.ADMIN)
-                .orElse(false);
-
-        if (!esProfesorDueno && !esAdmin) {
-            throw new BusinessException(
-                    "Solo el docente propietario o un administrador puede ver la lista de inscritos.");
-        }
-
-        return actividad;
-    }
-
-    private List<InscritoListaItemResponse> construirLista(Actividad actividad) {
-        List<InscritoListaItemResponse> lista = new ArrayList<>();
-        int num = 1;
-
-        // Internos (usuarios/alumnos)
-        for (var ins : inscripcionRepository.findByActividad_IdActividad(actividad.getIdActividad())) {
-            String nombre, tipo, identificador;
-
-            if (ins.getAlumno() != null) {
-                nombre        = ins.getAlumno().getNombre() + " " + ins.getAlumno().getApellidos();
-                tipo          = "Alumno";
-                identificador = ins.getAlumno().getMatricula();
-            } else {
-                nombre        = ins.getUsuario().getNombre() + " " + ins.getUsuario().getApellidos();
-                tipo          = "Docente/Staff";
-                identificador = ins.getUsuario().getCorreo();
-            }
-
-            lista.add(new InscritoListaItemResponse(
-                    num++, nombre, tipo, identificador,
-                    ins.getFechaInscripcion().format(FMT)));
-        }
-
-        // Externos
-        for (var ext : externoRepository.findByActividad_IdActividad(actividad.getIdActividad())) {
-            lista.add(new InscritoListaItemResponse(
-                    num++,
-                    ext.getNombre(),
-                    "Externo",
-                    ext.getCorreo() != null ? ext.getCorreo() : "—",
-                    ext.getFechaInscripcion().format(FMT)));
-        }
-
-        return lista;
-    }
-
-    private Cell celdaTabla(String texto, PdfFont font,
-                            com.itextpdf.kernel.colors.Color fondo) {
-        return new Cell()
-                .add(new Paragraph(texto != null ? texto : "—").setFont(font).setFontSize(9))
-                .setBackgroundColor(fondo)
-                .setPadding(4);
-    }
-
-    private String escapeCsv(String valor) {
+    private String escaparCsv(String valor) {
         if (valor == null) return "";
         if (valor.contains(",") || valor.contains("\"") || valor.contains("\n")) {
             return "\"" + valor.replace("\"", "\"\"") + "\"";
         }
         return valor;
+    }
+
+    // ====================================================================
+    // Construccion de la lista unificada (interno + externo)
+    // ====================================================================
+    private List<InscritoDTO> construirLista(Actividad actividad) {
+        List<InscritoDTO> lista = new ArrayList<>();
+        int numero = 1;
+
+        for (InscripcionActividad i : inscripcionRepository
+                .findByActividad_IdActividadOrderByFechaInscripcionAsc(actividad.getIdActividad())) {
+
+            if (i.getAlumno() != null) {
+                String nombreCompleto = i.getAlumno().getNombre() + " " + i.getAlumno().getApellidos();
+                lista.add(new InscritoDTO(numero++, nombreCompleto, TipoParticipante.ALUMNO,
+                        i.getAlumno().getMatricula(), i.getFechaInscripcion()));
+            } else if (i.getUsuario() != null) {
+                String nombreCompleto = i.getUsuario().getNombre() + " " + i.getUsuario().getApellidos();
+                lista.add(new InscritoDTO(numero++, nombreCompleto, TipoParticipante.DOCENTE,
+                        i.getUsuario().getCorreo(), i.getFechaInscripcion()));
+            }
+        }
+
+        for (InscripcionExterno e : externoRepository
+                .findByActividad_IdActividadOrderByFechaInscripcionAsc(actividad.getIdActividad())) {
+            lista.add(new InscritoDTO(numero++, e.getNombre(), TipoParticipante.EXTERNO,
+                    e.getCorreo() != null ? e.getCorreo() : "—", e.getFechaInscripcion()));
+        }
+
+        return lista;
+    }
+
+    private String etiquetaTipo(TipoParticipante tipo) {
+        return switch (tipo) {
+            case ALUMNO -> "Alumno";
+            case DOCENTE -> "Docente/Staff";
+            case EXTERNO -> "Externo";
+        };
+    }
+
+    // ====================================================================
+    // Validacion de acceso
+    // ====================================================================
+    private Actividad obtenerActividadValidada(Integer idActividad, Integer idSolicitante, boolean esAdmin) {
+        Actividad actividad = actividadRepository.findById(idActividad)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Actividad no encontrada con id: " + idActividad));
+
+        if (!Boolean.TRUE.equals(actividad.getRequiereInscripcion())) {
+            log.warn("Consulta de inscritos rechazada: actividad={} no requiere inscripcion", idActividad);
+            throw new BusinessException("Esta actividad no requiere inscripcion formal.");
+        }
+
+        boolean esPropietario = actividad.getProfesor() != null
+                && actividad.getProfesor().getIdUsuario().equals(idSolicitante);
+
+        if (!esAdmin && !esPropietario) {
+            log.warn("Acceso denegado a inscritos: actividad={} solicitante={}", idActividad, idSolicitante);
+            throw new BusinessException("No tienes permiso para consultar los inscritos de esta actividad.");
+        }
+
+        return actividad;
     }
 }
