@@ -213,8 +213,7 @@ public class SolicitudesServiceImpl implements SolicitudesService {
                 a.getTipo().getCategoria() != null ? a.getTipo().getCategoria().getNombre() : null,
                 organizadores,
                 recursos,
-                imagenes,
-                a.getRequiereInscripcion()
+                imagenes
         );
     }
 }

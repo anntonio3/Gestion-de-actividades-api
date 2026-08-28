@@ -1,6 +1,7 @@
 package mx.edu.unpa.actividadesapi.controller;
 
 import lombok.RequiredArgsConstructor;
+import mx.edu.unpa.actividadesapi.dto.response.ActividadInscripcionResumenDTO;
 import mx.edu.unpa.actividadesapi.dto.response.ListaInscritosResponseDTO;
 import mx.edu.unpa.actividadesapi.service.InscritosService;
 import org.slf4j.Logger;
@@ -11,6 +12,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * US-28: Endpoints para la lista de inscritos de una actividad.
@@ -84,6 +87,13 @@ public class InscritosController {
                 "attachment; filename=\"inscritos-actividad-" + idActividad + ".csv\"");
 
         return new ResponseEntity<>(csv, headers, org.springframework.http.HttpStatus.OK);
+    }
+
+    // Dashboard ADMIN: todas las actividades aprobadas con inscripcion (US-28)
+    @GetMapping("/admin/inscripcion")
+    public ResponseEntity<List<ActividadInscripcionResumenDTO>> listarParaAdmin() {
+        log.info("GET /api/actividades/admin/inscripcion");
+        return ResponseEntity.ok(inscritosService.listarActividadesConInscripcion());
     }
 
     // ── Helpers privados para leer el JWT ya validado por JwtFilter ──

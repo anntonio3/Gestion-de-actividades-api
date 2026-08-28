@@ -78,4 +78,7 @@ public interface ActividadRepository extends JpaRepository<Actividad, Integer> {
             @Param("horaFin") LocalTime horaFin
     );
 
+    // Actividades aprobadas que requieren inscripcion, para el dashboard de ADMIN (US-28)
+    List<Actividad> findByEstadoAndRequiereInscripcionTrueOrderByFechaActividadAsc(EstadoActividad estado);
+
 }

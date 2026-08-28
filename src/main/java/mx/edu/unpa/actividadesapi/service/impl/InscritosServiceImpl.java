@@ -4,8 +4,10 @@ import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import mx.edu.unpa.actividadesapi.dto.response.ActividadInscripcionResumenDTO;
 import mx.edu.unpa.actividadesapi.dto.response.InscritoDTO;
 import mx.edu.unpa.actividadesapi.dto.response.ListaInscritosResponseDTO;
+import mx.edu.unpa.actividadesapi.enums.EstadoActividad;
 import mx.edu.unpa.actividadesapi.enums.TipoParticipante;
 import mx.edu.unpa.actividadesapi.exception.BusinessException;
 import mx.edu.unpa.actividadesapi.exception.ResourceNotFoundException;
@@ -235,6 +237,41 @@ public class InscritosServiceImpl implements InscritosService {
 
         log.info("CSV de inscritos generado para actividad={}", idActividad);
         return sb.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    // ====================================================================
+    // Listado para ADMIN: todas las actividades aprobadas con inscripcion
+    // ====================================================================
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActividadInscripcionResumenDTO> listarActividadesConInscripcion() {
+        log.info("Listando actividades aprobadas con inscripcion para dashboard ADMIN");
+
+        List<Actividad> actividades = actividadRepository
+                .findByEstadoAndRequiereInscripcionTrueOrderByFechaActividadAsc(EstadoActividad.APROBADA);
+
+        List<ActividadInscripcionResumenDTO> resumen = actividades.stream()
+                .map(a -> {
+                    int internos = inscripcionRepository.countByActividad_IdActividad(a.getIdActividad());
+                    int externos = externoRepository.countByActividad_IdActividad(a.getIdActividad());
+                    String nombreProfesor = a.getProfesor() != null
+                            ? a.getProfesor().getNombre() + " " + a.getProfesor().getApellidos()
+                            : "—";
+
+                    return new ActividadInscripcionResumenDTO(
+                            a.getIdActividad(),
+                            a.getNombre(),
+                            nombreProfesor,
+                            a.getFechaActividad(),
+                            a.getHoraInicio(),
+                            a.getHoraFin(),
+                            internos + externos
+                    );
+                })
+                .toList();
+
+        log.info("Dashboard ADMIN: {} actividades con inscripcion encontradas", resumen.size());
+        return resumen;
     }
 
     private String escaparCsv(String valor) {
